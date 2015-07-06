@@ -4,9 +4,11 @@ import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.util.Progressable;
 import org.embulk.config.*;
-import org.embulk.spi.*;
+import org.embulk.spi.Buffer;
+import org.embulk.spi.Exec;
+import org.embulk.spi.FileOutputPlugin;
+import org.embulk.spi.TransactionalFileOutput;
 import org.jruby.embed.ScriptingContainer;
 import org.slf4j.Logger;
 
@@ -30,7 +32,7 @@ public class HdfsOutputPlugin implements FileOutputPlugin
         public Map<String, String> getConfig();
 
         @Config("sequence_format")
-        @ConfigDefault("\".%03d.%02d\"")
+        @ConfigDefault("\"%03d.%02d\"")
         public String getSequenceFormat();
 
         @Config("output_path")
@@ -142,14 +144,7 @@ public class HdfsOutputPlugin implements FileOutputPlugin
                 if (fs.exists(currentPath)) {
                     throw new IllegalAccessException(currentPath.toString() + "already exists.");
                 }
-                currentStream = fs.create(
-                    currentPath,
-                    new Progressable() {
-                        @Override
-                        public void progress() {
-                            logger.info("{} byte written.", 1);
-                        }
-                    });
+                currentStream = fs.create(currentPath);
                 logger.info("Uploading '{}'", currentPath.toString());
             }
             catch (IOException | IllegalAccessException e) {
