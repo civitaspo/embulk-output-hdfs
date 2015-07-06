@@ -137,7 +137,7 @@ public class HdfsOutputPlugin implements FileOutputPlugin
 
         public void nextFile() {
             closeCurrentStream();
-            currentPath = new Path(workingPath + String.format(sequenceFormat, taskIndex, fileIndex));
+            currentPath = new Path(workingPath + '/' + String.format(sequenceFormat, taskIndex, fileIndex));
             try {
                 if (fs.exists(currentPath)) {
                     throw new IllegalAccessException(currentPath.toString() + "already exists.");
