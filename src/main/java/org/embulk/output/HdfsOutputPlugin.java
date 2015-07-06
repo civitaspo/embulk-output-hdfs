@@ -36,7 +36,7 @@ public class HdfsOutputPlugin implements FileOutputPlugin
         public String getSequenceFormat();
 
         @Config("output_path")
-        @ConfigDefault("\"/tmp/embulk.working.hdfs_output.%Y%m%d_%s\"")
+        @ConfigDefault("\"/tmp/embulk.output.hdfs_output.%Y%m%d_%s\"")
         public String getOutputPath();
 
         @Config("working_path")
@@ -176,7 +176,9 @@ public class HdfsOutputPlugin implements FileOutputPlugin
         @Override
         public void finish() {
             try {
-                fs.rename(new Path(workingPath), new Path(outputPath));
+                Path outputHdfsPath = new Path(outputPath);
+                fs.mkdirs(outputHdfsPath);
+                fs.rename(new Path(workingPath), outputHdfsPath);
             } catch (IOException e) {
                 logger.error(e.getMessage());
                 throw Throwables.propagate(e);
