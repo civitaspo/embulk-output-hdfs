@@ -79,7 +79,8 @@ public class HdfsOutputPlugin implements FileOutputPlugin
         Configuration configuration = getHdfsConfiguration(task);
         FileSystem fs = getFs(configuration);
         String workingPath = strftime(task.getWorkingPath());
-        return new TransactionalHdfsFileOutput(task, fs, workingPath, taskIndex);
+        String outputPath = strftime(task.getOutputPath());
+        return new TransactionalHdfsFileOutput(task, fs, workingPath, outputPath, taskIndex);
     }
 
     private Configuration getHdfsConfiguration(final PluginTask task)
@@ -122,6 +123,7 @@ public class HdfsOutputPlugin implements FileOutputPlugin
         private final int taskIndex;
         private final FileSystem fs;
         private final String workingPath;
+        private final String outputPath;
         private final String sequenceFormat;
 
         private int fileIndex = 0;
@@ -129,11 +131,12 @@ public class HdfsOutputPlugin implements FileOutputPlugin
         private Path currentPath = null;
         private OutputStream currentStream = null;
 
-        public TransactionalHdfsFileOutput(PluginTask task, FileSystem fs, String workingPath, int taskIndex)
+        public TransactionalHdfsFileOutput(PluginTask task, FileSystem fs, String workingPath, String outputPath, int taskIndex)
         {
             this.taskIndex = taskIndex;
             this.fs = fs;
             this.workingPath = workingPath;
+            this.outputPath = outputPath;
             this.sequenceFormat = task.getSequenceFormat();
         }
 
@@ -172,6 +175,12 @@ public class HdfsOutputPlugin implements FileOutputPlugin
 
         @Override
         public void finish() {
+            try {
+                fs.rename(new Path(workingPath), new Path(outputPath));
+            } catch (IOException e) {
+                logger.error(e.getMessage());
+                throw Throwables.propagate(e);
+            }
             closeCurrentStream();
         }
 
