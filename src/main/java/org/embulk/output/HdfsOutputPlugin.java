@@ -33,11 +33,11 @@ public class HdfsOutputPlugin implements FileOutputPlugin
         public String getSequenceFormat();
 
         @Config("output_path")
-        @ConfigDefault("/tmp/embulk.working.hdfs_output.%Y%m%d_%s")
+        @ConfigDefault("\"/tmp/embulk.working.hdfs_output.%Y%m%d_%s\"")
         public String getOutputPath();
 
         @Config("working_path")
-        @ConfigDefault("/tmp/embulk.working.hdfs_output.%Y%m%d_%s")
+        @ConfigDefault("\"/tmp/embulk.working.hdfs_output.%Y%m%d_%s\"")
         public String getWorkingPath();
 
     }
