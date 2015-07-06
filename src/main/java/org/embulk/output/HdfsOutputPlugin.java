@@ -4,6 +4,7 @@ import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.util.Progressable;
 import org.embulk.config.*;
 import org.embulk.spi.*;
 import org.jruby.embed.ScriptingContainer;
@@ -139,13 +140,19 @@ public class HdfsOutputPlugin implements FileOutputPlugin
             currentPath = new Path(workingPath + String.format(sequenceFormat, taskIndex, fileIndex));
             try {
                 if (fs.exists(currentPath)) {
-                    // TODO:　appropriate exception
-                    throw Throwables.propagate(new IOException(currentPath.toString() + "already exists."));
+                    throw new IllegalAccessException(currentPath.toString() + "already exists.");
                 }
-                currentStream = fs.create(currentPath);
+                currentStream = fs.create(
+                    currentPath,
+                    new Progressable() {
+                        @Override
+                        public void progress() {
+                            logger.info("{} byte written.", 1);
+                        }
+                    });
                 logger.info("Uploading '{}'", currentPath.toString());
             }
-            catch (IOException e) {
+            catch (IOException | IllegalAccessException e) {
                 logger.error(e.getMessage());
                 throw Throwables.propagate(e);
             }
