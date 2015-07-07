@@ -59,7 +59,7 @@ Gem::Specification.new do |spec|
   spec.description   = %[Dumps records to Hdfs.]
   spec.email         = ["civitaspo@gmail.com"]
   spec.licenses      = ["MIT"]
-  # TODO set this: spec.homepage      = "https://github.com/civitaspo/embulk-output-hdfs"
+  spec.homepage      = "https://github.com/civitaspo/embulk-output-hdfs"
 
   spec.files         = `git ls-files`.split("\n") + Dir["classpath/*.jar"]
   spec.test_files    = spec.files.grep(%r"^(test|spec)/")
