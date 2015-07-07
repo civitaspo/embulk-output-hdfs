@@ -175,14 +175,6 @@ public class HdfsOutputPlugin implements FileOutputPlugin
 
         @Override
         public void finish() {
-            try {
-                Path outputHdfsPath = new Path(outputPath);
-                fs.mkdirs(outputHdfsPath);
-                fs.rename(new Path(workingPath), outputHdfsPath);
-            } catch (IOException e) {
-                logger.error(e.getMessage());
-                throw Throwables.propagate(e);
-            }
             closeCurrentStream();
         }
 
@@ -197,6 +189,13 @@ public class HdfsOutputPlugin implements FileOutputPlugin
 
         @Override
         public CommitReport commit() {
+            try {
+                fs.rename(new Path(workingPath), new Path(outputPath));
+            } catch (IOException e) {
+                logger.error(e.getMessage());
+                throw Throwables.propagate(e);
+            }
+
             CommitReport report = Exec.newCommitReport();
             report.set("files", currentPath);
             return report;
