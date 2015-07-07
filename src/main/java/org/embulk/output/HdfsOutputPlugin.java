@@ -191,6 +191,7 @@ public class HdfsOutputPlugin implements FileOutputPlugin
         public CommitReport commit() {
             try {
                 fs.rename(new Path(workingPath), new Path(outputPath));
+                logger.info("rename {} => {}", workingPath, outputPath);
             } catch (IOException e) {
                 logger.error(e.getMessage());
                 throw Throwables.propagate(e);
