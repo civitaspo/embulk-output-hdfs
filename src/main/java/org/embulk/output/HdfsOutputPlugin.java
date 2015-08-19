@@ -67,7 +67,7 @@ public class HdfsOutputPlugin implements FileOutputPlugin
     @Override
     public void cleanup(TaskSource taskSource,
                         int taskCount,
-                        List<CommitReport> successCommitReports)
+                        List<TaskReport> successTaskReports)
     {
     }
 
@@ -188,7 +188,7 @@ public class HdfsOutputPlugin implements FileOutputPlugin
         }
 
         @Override
-        public CommitReport commit() {
+        public TaskReport commit() {
             try {
                 fs.rename(new Path(workingPath), new Path(outputPath));
                 logger.info("rename {} => {}", workingPath, outputPath);
@@ -197,7 +197,7 @@ public class HdfsOutputPlugin implements FileOutputPlugin
                 throw Throwables.propagate(e);
             }
 
-            CommitReport report = Exec.newCommitReport();
+            TaskReport report = Exec.newTaskReport();
             report.set("files", currentPath);
             return report;
         }
