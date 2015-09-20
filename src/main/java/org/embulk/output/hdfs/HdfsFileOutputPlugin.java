@@ -53,7 +53,6 @@ public class HdfsFileOutputPlugin
         @ConfigDefault("0")
         public int getRewindSeconds();
 
-        // this parameter is experimental.
         @Config("overwrite")
         @ConfigDefault("false")
         public boolean getOverwrite();
@@ -147,7 +146,6 @@ public class HdfsFileOutputPlugin
             @Override
             public void abort()
             {
-
             }
 
             @Override
