@@ -12,7 +12,7 @@ configurations {
     provided
 }
 
-version = "0.1.2"
+version = "0.2.0"
 
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
@@ -22,7 +22,7 @@ dependencies {
     provided "org.embulk:embulk-core:0.7.0"
     // compile "YOUR_JAR_DEPENDENCY_GROUP:YOUR_JAR_DEPENDENCY_MODULE:YOUR_JAR_DEPENDENCY_VERSION"
     compile 'org.apache.hadoop:hadoop-client:2.6.0'
-    compile 'com.google.guava:guava:14.0'
+    compile 'com.google.guava:guava:15.0'
     testCompile "junit:junit:4.+"
 }
 
@@ -57,9 +57,9 @@ task gemspec {
 Gem::Specification.new do |spec|
   spec.name          = "${project.name}"
   spec.version       = "${project.version}"
-  spec.authors       = ["takahiro.nakayama"]
-  spec.summary       = %[Hdfs output plugin for Embulk]
-  spec.description   = %[Dumps records to Hdfs.]
+  spec.authors       = ["Civitaspo"]
+  spec.summary       = %[Hdfs file output plugin for Embulk]
+  spec.description   = %[Stores files on Hdfs.]
   spec.email         = ["civitaspo@gmail.com"]
   spec.licenses      = ["MIT"]
   spec.homepage      = "https://github.com/civitaspo/embulk-output-hdfs"

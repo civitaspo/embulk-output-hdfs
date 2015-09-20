@@ -6,3 +6,6 @@
 /classpath/
 build/
 .idea
+*.iml
+.ruby-version
+
