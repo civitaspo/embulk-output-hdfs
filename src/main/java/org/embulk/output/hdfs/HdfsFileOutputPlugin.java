@@ -1,5 +1,6 @@
 package org.embulk.output.hdfs;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -176,10 +177,10 @@ public class HdfsFileOutputPlugin
     {
         Configuration configuration = new Configuration();
 
-        for (Object configFile : task.getConfigFiles()) {
-            configuration.addResource(configFile.toString());
+        for (String configFile : task.getConfigFiles()) {
+            File file = new File(configFile);
+            configuration.addResource(file.toURI().toURL());
         }
-        configuration.reloadConfiguration();
 
         for (Map.Entry<String, String> entry: task.getConfig().entrySet()) {
             configuration.set(entry.getKey(), entry.getValue());
