@@ -1,21 +1,16 @@
 package org.embulk.output.hdfs;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
+import com.google.common.base.Optional;
+import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.embulk.config.TaskReport;
 import org.embulk.config.Config;
 import org.embulk.config.ConfigDefault;
 import org.embulk.config.ConfigDiff;
 import org.embulk.config.ConfigSource;
 import org.embulk.config.Task;
+import org.embulk.config.TaskReport;
 import org.embulk.config.TaskSource;
 import org.embulk.spi.Buffer;
 import org.embulk.spi.Exec;
@@ -23,6 +18,14 @@ import org.embulk.spi.FileOutputPlugin;
 import org.embulk.spi.TransactionalFileOutput;
 import org.jruby.embed.ScriptingContainer;
 import org.slf4j.Logger;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 public class HdfsFileOutputPlugin
         implements FileOutputPlugin
@@ -58,6 +61,9 @@ public class HdfsFileOutputPlugin
         @ConfigDefault("false")
         public boolean getOverwrite();
 
+        @Config("doas")
+        @ConfigDefault("null")
+        public Optional<String> getDoas();
     }
 
     @Override
@@ -186,6 +192,15 @@ public class HdfsFileOutputPlugin
             configuration.set(entry.getKey(), entry.getValue());
         }
 
+        if (task.getDoas().isPresent()) {
+            URI uri = FileSystem.getDefaultUri(configuration);
+            try {
+                return FileSystem.get(uri, configuration, task.getDoas().get());
+            }
+            catch (InterruptedException e) {
+                throw Throwables.propagate(e);
+            }
+        }
         return FileSystem.get(configuration);
     }
 
