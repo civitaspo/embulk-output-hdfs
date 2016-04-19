@@ -66,9 +66,9 @@ public class HdfsFileOutputPlugin
         @ConfigDefault("null")
         Optional<String> getDoas();
 
-        @Config("remove_in_advance")
+        @Config("delete_in_advance")
         @ConfigDefault("false")
-        boolean getRemoveInAdvance();
+        boolean getDeleteInAdvance();
     }
 
     @Override
@@ -77,12 +77,13 @@ public class HdfsFileOutputPlugin
     {
         PluginTask task = config.loadConfig(PluginTask.class);
 
-        if (task.getRemoveInAdvance()) {
+        if (task.getDeleteInAdvance()) {
             final String pathPrefix = strftime(task.getPathPrefix(), task.getRewindSeconds());
             final Path globPath = new Path(pathPrefix + "*");
             try {
                 FileSystem fs = getFs(task);
                 for (FileStatus status : fs.globStatus(globPath)) {
+                    logger.debug("delete in advance: {}", status.getPath());
                     fs.delete(status.getPath(), true);
                 }
             }
