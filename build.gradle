@@ -3,6 +3,8 @@ plugins {
     id "com.github.jruby-gradle.base" version "0.1.5"
     id "java"
     id "checkstyle"
+    id "com.github.kt3k.coveralls" version "2.4.0"
+    id "jacoco"
 }
 import com.github.jrubygradle.JRubyExec
 repositories {
@@ -36,6 +38,12 @@ task classpath(type: Copy, dependsOn: ["jar"]) {
 }
 clean { delete "classpath" }
 
+jacocoTestReport {
+    reports {
+        xml.enabled = true // coveralls plugin depends on xml format report
+        html.enabled = true
+    }
+}
 checkstyle {
     configFile = file("${project.rootDir}/config/checkstyle/checkstyle.xml")
     toolVersion = '6.14.1'

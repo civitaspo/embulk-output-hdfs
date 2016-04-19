@@ -1,6 +1,7 @@
 # Hdfs file output plugin for Embulk
 
 [![Build Status](https://travis-ci.org/civitaspo/embulk-output-hdfs.svg)](https://travis-ci.org/civitaspo/embulk-output-hdfs)
+[![Coverage Status](https://coveralls.io/repos/github/civitaspo/embulk-output-hdfs/badge.svg?branch=master)](https://coveralls.io/github/civitaspo/embulk-output-hdfs?branch=master)
 
 A File Output Plugin for Embulk to write HDFS.
 
