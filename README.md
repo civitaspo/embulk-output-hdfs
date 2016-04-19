@@ -20,6 +20,7 @@ A File Output Plugin for Embulk to write HDFS.
 - **overwrite** overwrite files when the same filenames already exists (boolean, default: `false`)
     - *caution*: even if this property is `true`, this does not mean ensuring the idempotence. if you want to ensure the idempotence, you need the procedures to remove output files after or before running. 
 - **doas** username which access to Hdfs (string, default: executed user)
+- **remove_in_advance** remove files and directories having `path_prefix` in advance (boolean, default: `false`)
 
 ## Example
 
