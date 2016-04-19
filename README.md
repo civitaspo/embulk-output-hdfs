@@ -22,6 +22,12 @@ A File Output Plugin for Embulk to write HDFS.
 - **doas** username which access to Hdfs (string, default: executed user)
 - **delete_in_advance** delete files and directories having `path_prefix` in advance (boolean, default: `false`)
 
+## CAUTION
+If you use `hadoop` user (hdfs admin user) as `doas`, and if `delete_in_advance` is true,
+`embulk-output-hdfs` can delete any files and directories you indicate as `path_prefix`,
+this means `embulk-output-hdfs` can destroy your hdfs.
+So, please be careful when you use `delete_in_advance` option and `doas` option ...
+
 ## Example
 
 ```yaml
