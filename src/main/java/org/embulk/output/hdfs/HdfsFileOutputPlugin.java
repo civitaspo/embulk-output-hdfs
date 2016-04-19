@@ -64,6 +64,10 @@ public class HdfsFileOutputPlugin
         @Config("doas")
         @ConfigDefault("null")
         public Optional<String> getDoas();
+
+        @Config("remove_in_advance")
+        @ConfigDefault("false")
+        public boolean getRemoveInAdvance();
     }
 
     @Override
