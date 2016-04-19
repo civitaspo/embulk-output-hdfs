@@ -3,6 +3,7 @@ package org.embulk.output.hdfs;
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.embulk.config.Config;
@@ -75,6 +76,20 @@ public class HdfsFileOutputPlugin
             FileOutputPlugin.Control control)
     {
         PluginTask task = config.loadConfig(PluginTask.class);
+
+        if (task.getRemoveInAdvance()) {
+            final String pathPrefix = strftime(task.getPathPrefix(), task.getRewindSeconds());
+            final Path globPath = new Path(pathPrefix + "*");
+            try {
+                FileSystem fs = getFs(task);
+                for (FileStatus status : fs.globStatus(globPath)) {
+                    fs.delete(status.getPath(), true);
+                }
+            }
+            catch (IOException e) {
+                throw Throwables.propagate(e);
+            }
+        }
 
         control.run(task.dump());
         return Exec.newConfigDiff();
