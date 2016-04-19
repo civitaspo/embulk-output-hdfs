@@ -26,6 +26,7 @@ dependencies {
     compile 'com.google.guava:guava:15.0'
     testCompile "junit:junit:4.+"
     testCompile "org.embulk:embulk-core:0.8.8:tests"
+    testCompile "org.embulk:embulk-standards:0.8.8"
 }
 
 task classpath(type: Copy, dependsOn: ["jar"]) {
