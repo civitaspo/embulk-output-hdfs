@@ -37,37 +37,37 @@ public class HdfsFileOutputPlugin
     {
         @Config("config_files")
         @ConfigDefault("[]")
-        public List<String> getConfigFiles();
+        List<String> getConfigFiles();
 
         @Config("config")
         @ConfigDefault("{}")
-        public Map<String, String> getConfig();
+        Map<String, String> getConfig();
 
         @Config("path_prefix")
-        public String getPathPrefix();
+        String getPathPrefix();
 
         @Config("file_ext")
-        public String getFileNameExtension();
+        String getFileNameExtension();
 
         @Config("sequence_format")
         @ConfigDefault("\"%03d.%02d.\"")
-        public String getSequenceFormat();
+        String getSequenceFormat();
 
         @Config("rewind_seconds")
         @ConfigDefault("0")
-        public int getRewindSeconds();
+        int getRewindSeconds();
 
         @Config("overwrite")
         @ConfigDefault("false")
-        public boolean getOverwrite();
+        boolean getOverwrite();
 
         @Config("doas")
         @ConfigDefault("null")
-        public Optional<String> getDoas();
+        Optional<String> getDoas();
 
         @Config("remove_in_advance")
         @ConfigDefault("false")
-        public boolean getRemoveInAdvance();
+        boolean getRemoveInAdvance();
     }
 
     @Override
