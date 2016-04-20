@@ -9,6 +9,7 @@ import org.apache.hadoop.fs.Path;
 import org.embulk.config.Config;
 import org.embulk.config.ConfigDefault;
 import org.embulk.config.ConfigDiff;
+import org.embulk.config.ConfigException;
 import org.embulk.config.ConfigSource;
 import org.embulk.config.Task;
 import org.embulk.config.TaskReport;
@@ -27,6 +28,8 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import static org.embulk.output.hdfs.HdfsFileOutputPlugin.PluginTask.*;
 
 public class HdfsFileOutputPlugin
         implements FileOutputPlugin
@@ -48,7 +51,7 @@ public class HdfsFileOutputPlugin
         String getPathPrefix();
 
         @Config("file_ext")
-        String getFileNameExtension();
+        String getFileExt();
 
         @Config("sequence_format")
         @ConfigDefault("\"%03d.%02d.\"")
@@ -66,9 +69,10 @@ public class HdfsFileOutputPlugin
         @ConfigDefault("null")
         Optional<String> getDoas();
 
+        enum DeleteInAdvancePolicy{ NONE, FILE_ONLY, RECURSIVE}
         @Config("delete_in_advance")
-        @ConfigDefault("false")
-        boolean getDeleteInAdvance();
+        @ConfigDefault("\"NONE\"")
+        DeleteInAdvancePolicy getDeleteInAdvance();
     }
 
     @Override
@@ -77,19 +81,13 @@ public class HdfsFileOutputPlugin
     {
         PluginTask task = config.loadConfig(PluginTask.class);
 
-        if (task.getDeleteInAdvance()) {
-            final String pathPrefix = strftime(task.getPathPrefix(), task.getRewindSeconds());
-            final Path globPath = new Path(pathPrefix + "*");
-            try {
-                FileSystem fs = getFs(task);
-                for (FileStatus status : fs.globStatus(globPath)) {
-                    logger.debug("delete in advance: {}", status.getPath());
-                    fs.delete(status.getPath(), true);
-                }
-            }
-            catch (IOException e) {
-                throw Throwables.propagate(e);
-            }
+        try {
+            String pathPrefix = strftime(task.getPathPrefix(), task.getRewindSeconds());
+            FileSystem fs = getFs(task);
+            deleteInAdvance(fs, pathPrefix, task.getDeleteInAdvance());
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
         }
 
         control.run(task.dump());
@@ -117,7 +115,7 @@ public class HdfsFileOutputPlugin
         final PluginTask task = taskSource.loadTask(PluginTask.class);
 
         final String pathPrefix = strftime(task.getPathPrefix(), task.getRewindSeconds());
-        final String pathSuffix = task.getFileNameExtension();
+        final String pathSuffix = task.getFileExt();
         final String sequenceFormat = task.getSequenceFormat();
 
         return new TransactionalFileOutput()
@@ -230,5 +228,32 @@ public class HdfsFileOutputPlugin
         Object resolved = jruby.runScriptlet(
                 String.format("(Time.now - %s).strftime('%s')", String.valueOf(rewind_seconds), raw));
         return resolved.toString();
+    }
+
+    private void deleteInAdvance(FileSystem fs, String pathPrefix, DeleteInAdvancePolicy deleteInAdvancePolicy)
+            throws IOException
+    {
+        final Path globPath = new Path(pathPrefix + "*");
+        switch (deleteInAdvancePolicy) {
+            case NONE:
+                // do nothing
+                break;
+            case FILE_ONLY:
+                for (FileStatus status : fs.globStatus(globPath)) {
+                    if (status.isFile()) {
+                        logger.debug("delete in advance: {}", status.getPath());
+                        fs.delete(status.getPath(), false);
+                    }
+                }
+                break;
+            case RECURSIVE:
+                for (FileStatus status : fs.globStatus(globPath)) {
+                    logger.debug("delete in advance: {}", status.getPath());
+                    fs.delete(status.getPath(), true);
+                }
+                break;
+            default:
+                throw new ConfigException("`delete_in_advance` must not null.");
+        }
     }
 }

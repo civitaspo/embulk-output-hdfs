@@ -23,10 +23,13 @@ A File Output Plugin for Embulk to write HDFS.
 - **overwrite** overwrite files when the same filenames already exists (boolean, default: `false`)
     - *caution*: even if this property is `true`, this does not mean ensuring the idempotence. if you want to ensure the idempotence, you need the procedures to remove output files after or before running. 
 - **doas** username which access to Hdfs (string, default: executed user)
-- **delete_in_advance** delete files and directories having `path_prefix` in advance (boolean, default: `false`)
+- **delete_in_advance** delete files and directories having `path_prefix` in advance (enum, default: `NONE`)
+    - `NONE`: do nothing
+    - `FILE_ONLY`: delete files
+    - `RECURSIVE`: delete files and directories
 
 ## CAUTION
-If you use `hadoop` user (hdfs admin user) as `doas`, and if `delete_in_advance` is true,
+If you use `hadoop` user (hdfs admin user) as `doas`, and if `delete_in_advance` is `RECURSIVE`,
 `embulk-output-hdfs` can delete any files and directories you indicate as `path_prefix`,
 this means `embulk-output-hdfs` can destroy your hdfs.
 So, please be careful when you use `delete_in_advance` option and `doas` option ...

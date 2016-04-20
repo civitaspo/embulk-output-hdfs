@@ -102,14 +102,14 @@ public class TestHdfsFileOutputPlugin
         ConfigSource config = getBaseConfigSource();
         PluginTask task = config.loadConfig(PluginTask.class);
         assertEquals(pathPrefix, task.getPathPrefix());
-        assertEquals("csv", task.getFileNameExtension());
+        assertEquals("csv", task.getFileExt());
         assertEquals("%03d.%02d.", task.getSequenceFormat());
         assertEquals(Lists.newArrayList(), task.getConfigFiles());
         assertEquals(Maps.newHashMap(), task.getConfig());
         assertEquals(0, task.getRewindSeconds());
         assertEquals(false, task.getOverwrite());
         assertEquals(Optional.absent(), task.getDoas());
-        assertEquals(false, task.getDeleteInAdvance());
+        assertEquals(PluginTask.DeleteInAdvancePolicy.NONE, task.getDeleteInAdvance());
     }
 
     @Test(expected = ConfigException.class)
@@ -119,24 +119,25 @@ public class TestHdfsFileOutputPlugin
         PluginTask task = config.loadConfig(PluginTask.class);
     }
 
-    private List<String> lsR(List<String> fileNames, java.nio.file.Path dir)
+    private List<String> lsR(List<String> names, java.nio.file.Path dir)
     {
         try (DirectoryStream<java.nio.file.Path> stream = Files.newDirectoryStream(dir)) {
             for (java.nio.file.Path path : stream) {
                 if (path.toFile().isDirectory()) {
                     logger.debug("[lsR] find a directory: {}", path.toAbsolutePath().toString());
-                    lsR(fileNames, path);
+                    names.add(path.toAbsolutePath().toString());
+                    lsR(names, path);
                 }
                 else {
                     logger.debug("[lsR] find a file: {}", path.toAbsolutePath().toString());
-                    fileNames.add(path.toAbsolutePath().toString());
+                    names.add(path.toAbsolutePath().toString());
                 }
             }
         }
         catch (IOException e) {
             logger.debug(e.getMessage(), e);
         }
-        return fileNames;
+        return names;
     }
 
     private void run(ConfigSource config)
@@ -218,12 +219,12 @@ public class TestHdfsFileOutputPlugin
     }
 
     @Test
-    public void testDeleteInAdvance()
+    public void testDeleteRECURSIVEInAdvance()
             throws IOException
     {
         for (int n = 0; n <= 10; n++) {
-            tmpFolder.newFile("embulk-output-hdfs_" + n + ".txt");
-            tmpFolder.newFolder("embulk-output-hdfs_" + n);
+            tmpFolder.newFile("embulk-output-hdfs_file_" + n + ".txt");
+            tmpFolder.newFolder("embulk-output-hdfs_directory_" + n);
         }
 
         List<String> fileListBeforeRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
@@ -233,13 +234,44 @@ public class TestHdfsFileOutputPlugin
                         .set("fs.hdfs.impl", "org.apache.hadoop.fs.RawLocalFileSystem")
                         .set("fs.file.impl", "org.apache.hadoop.fs.RawLocalFileSystem")
                         .set("fs.defaultFS", "file:///"))
-                .set("delete_in_advance", true);
+                .set("delete_in_advance", "RECURSIVE");
+
+        run(config);
+
+        List<String> fileListAfterRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
+        assertNotEquals(fileListBeforeRun, fileListAfterRun);
+        assertThat(fileListAfterRun, not(hasItem(containsString("embulk-output-hdfs_directory"))));
+        assertThat(fileListAfterRun, not(hasItem(containsString("txt"))));
+        assertThat(fileListAfterRun, hasItem(containsString(pathPrefix + "001.00.csv")));
+        assertRecordsInFile(String.format("%s/%s001.00.csv",
+                tmpFolder.getRoot().getAbsolutePath(),
+                pathPrefix));
+    }
+
+    @Test
+    public void testDeleteFILE_ONLYInAdvance()
+            throws IOException
+    {
+        for (int n = 0; n <= 10; n++) {
+            tmpFolder.newFile("embulk-output-hdfs_file_" + n + ".txt");
+            tmpFolder.newFolder("embulk-output-hdfs_directory_" + n);
+        }
+
+        List<String> fileListBeforeRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
+
+        ConfigSource config = getBaseConfigSource()
+                .setNested("config", Exec.newConfigSource()
+                        .set("fs.hdfs.impl", "org.apache.hadoop.fs.RawLocalFileSystem")
+                        .set("fs.file.impl", "org.apache.hadoop.fs.RawLocalFileSystem")
+                        .set("fs.defaultFS", "file:///"))
+                .set("delete_in_advance", "FILE_ONLY");
 
         run(config);
 
         List<String> fileListAfterRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
         assertNotEquals(fileListBeforeRun, fileListAfterRun);
         assertThat(fileListAfterRun, not(hasItem(containsString("txt"))));
+        assertThat(fileListAfterRun, hasItem(containsString("embulk-output-hdfs_directory")));
         assertThat(fileListAfterRun, hasItem(containsString(pathPrefix + "001.00.csv")));
         assertRecordsInFile(String.format("%s/%s001.00.csv",
                 tmpFolder.getRoot().getAbsolutePath(),
