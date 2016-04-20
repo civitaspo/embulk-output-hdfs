@@ -38,7 +38,7 @@ out:
   <<: *local_fs_example
   path_prefix: /tmp/embulk-output-hdfs_example/file_
   file_ext: csv
-  delete_in_advance: true
+  delete_in_advance: FILE_ONLY
   formatter:
     type: csv
     newline: CRLF
