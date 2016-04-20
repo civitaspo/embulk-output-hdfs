@@ -1,0 +1,52 @@
+hdfs_example: &hdfs_example
+  config_files:
+    - /etc/hadoop/conf/core-site.xml
+    - /etc/hadoop/conf/hdfs-site.xml
+  config:
+    fs.defaultFS: 'hdfs://hadoop-nn1:8020'
+    fs.hdfs.impl: 'org.apache.hadoop.hdfs.DistributedFileSystem'
+    fs.file.impl: 'org.apache.hadoop.fs.LocalFileSystem'
+
+local_fs_example: &local_fs_example
+  config:
+    fs.defaultFS: 'file:///'
+    fs.hdfs.impl: 'org.apache.hadoop.fs.RawLocalFileSystem'
+    fs.file.impl: 'org.apache.hadoop.fs.RawLocalFileSystem'
+    io.compression.codecs: 'org.apache.hadoop.io.compress.GzipCodec,org.apache.hadoop.io.compress.DefaultCodec,org.apache.hadoop.io.compress.BZip2Codec'
+
+in:
+  type: file
+  path_prefix: example/data
+  parser:
+    charset: UTF-8
+    newline: CRLF
+    type: csv
+    delimiter: ','
+    quote: '"'
+    header_line: true
+    stop_on_invalid_record: true
+    columns:
+    - {name: id, type: long}
+    - {name: account, type: long}
+    - {name: time, type: timestamp, format: '%Y-%m-%d %H:%M:%S'}
+    - {name: purchase, type: timestamp, format: '%Y%m%d'}
+    - {name: comment, type: string}
+
+
+out:
+  type: hdfs
+  <<: *local_fs_example
+  path_prefix: /tmp/embulk-output-hdfs_example/file_
+  file_ext: csv
+  delete_in_advance: true
+  formatter:
+    type: csv
+    newline: CRLF
+    newline_in_field: LF
+    header_line: true
+    charset: UTF-8
+    quote_policy: NONE
+    quote: '"'
+    escape: '\'
+    null_string: ''
+    default_timezone: UTC

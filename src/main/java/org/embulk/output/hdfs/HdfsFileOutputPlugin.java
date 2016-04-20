@@ -3,11 +3,13 @@ package org.embulk.output.hdfs;
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.embulk.config.Config;
 import org.embulk.config.ConfigDefault;
 import org.embulk.config.ConfigDiff;
+import org.embulk.config.ConfigException;
 import org.embulk.config.ConfigSource;
 import org.embulk.config.Task;
 import org.embulk.config.TaskReport;
@@ -27,6 +29,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static org.embulk.output.hdfs.HdfsFileOutputPlugin.PluginTask.*;
+
 public class HdfsFileOutputPlugin
         implements FileOutputPlugin
 {
@@ -37,33 +41,38 @@ public class HdfsFileOutputPlugin
     {
         @Config("config_files")
         @ConfigDefault("[]")
-        public List<String> getConfigFiles();
+        List<String> getConfigFiles();
 
         @Config("config")
         @ConfigDefault("{}")
-        public Map<String, String> getConfig();
+        Map<String, String> getConfig();
 
         @Config("path_prefix")
-        public String getPathPrefix();
+        String getPathPrefix();
 
         @Config("file_ext")
-        public String getFileNameExtension();
+        String getFileExt();
 
         @Config("sequence_format")
         @ConfigDefault("\"%03d.%02d.\"")
-        public String getSequenceFormat();
+        String getSequenceFormat();
 
         @Config("rewind_seconds")
         @ConfigDefault("0")
-        public int getRewindSeconds();
+        int getRewindSeconds();
 
         @Config("overwrite")
         @ConfigDefault("false")
-        public boolean getOverwrite();
+        boolean getOverwrite();
 
         @Config("doas")
         @ConfigDefault("null")
-        public Optional<String> getDoas();
+        Optional<String> getDoas();
+
+        enum DeleteInAdvancePolicy{ NONE, FILE_ONLY, RECURSIVE}
+        @Config("delete_in_advance")
+        @ConfigDefault("\"NONE\"")
+        DeleteInAdvancePolicy getDeleteInAdvance();
     }
 
     @Override
@@ -71,6 +80,15 @@ public class HdfsFileOutputPlugin
             FileOutputPlugin.Control control)
     {
         PluginTask task = config.loadConfig(PluginTask.class);
+
+        try {
+            String pathPrefix = strftime(task.getPathPrefix(), task.getRewindSeconds());
+            FileSystem fs = getFs(task);
+            deleteInAdvance(fs, pathPrefix, task.getDeleteInAdvance());
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
+        }
 
         control.run(task.dump());
         return Exec.newConfigDiff();
@@ -97,7 +115,7 @@ public class HdfsFileOutputPlugin
         final PluginTask task = taskSource.loadTask(PluginTask.class);
 
         final String pathPrefix = strftime(task.getPathPrefix(), task.getRewindSeconds());
-        final String pathSuffix = task.getFileNameExtension();
+        final String pathSuffix = task.getFileExt();
         final String sequenceFormat = task.getSequenceFormat();
 
         return new TransactionalFileOutput()
@@ -210,5 +228,32 @@ public class HdfsFileOutputPlugin
         Object resolved = jruby.runScriptlet(
                 String.format("(Time.now - %s).strftime('%s')", String.valueOf(rewind_seconds), raw));
         return resolved.toString();
+    }
+
+    private void deleteInAdvance(FileSystem fs, String pathPrefix, DeleteInAdvancePolicy deleteInAdvancePolicy)
+            throws IOException
+    {
+        final Path globPath = new Path(pathPrefix + "*");
+        switch (deleteInAdvancePolicy) {
+            case NONE:
+                // do nothing
+                break;
+            case FILE_ONLY:
+                for (FileStatus status : fs.globStatus(globPath)) {
+                    if (status.isFile()) {
+                        logger.debug("delete in advance: {}", status.getPath());
+                        fs.delete(status.getPath(), false);
+                    }
+                }
+                break;
+            case RECURSIVE:
+                for (FileStatus status : fs.globStatus(globPath)) {
+                    logger.debug("delete in advance: {}", status.getPath());
+                    fs.delete(status.getPath(), true);
+                }
+                break;
+            default:
+                throw new ConfigException("`delete_in_advance` must not null.");
+        }
     }
 }
