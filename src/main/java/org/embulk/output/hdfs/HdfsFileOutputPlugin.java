@@ -122,23 +122,14 @@ public class HdfsFileOutputPlugin
         {
             private final List<String> hdfsFileNames = new ArrayList<>();
             private int fileIndex = 0;
+            private Path currentPath = null;
             private OutputStream output = null;
 
             @Override
             public void nextFile()
             {
                 closeCurrentStream();
-                Path path = new Path(pathPrefix + String.format(sequenceFormat, taskIndex, fileIndex) + pathSuffix);
-                try {
-                    FileSystem fs = getFs(task);
-                    output = fs.create(path, task.getOverwrite());
-                    logger.info("Uploading '{}'", path);
-                }
-                catch (IOException e) {
-                    logger.error(e.getMessage());
-                    throw new RuntimeException(e);
-                }
-                hdfsFileNames.add(path.toString());
+                currentPath = new Path(pathPrefix + String.format(sequenceFormat, taskIndex, fileIndex) + pathSuffix);
                 fileIndex++;
             }
 
@@ -146,6 +137,13 @@ public class HdfsFileOutputPlugin
             public void add(Buffer buffer)
             {
                 try {
+                    // this implementation is for creating file when there is data.
+                    if (output == null) {
+                        FileSystem fs = getFs(task);
+                        output = fs.create(currentPath, task.getOverwrite());
+                        logger.info("Uploading '{}'", currentPath);
+                        hdfsFileNames.add(currentPath.toString());
+                    }
                     output.write(buffer.array(), buffer.offset(), buffer.limit());
                 }
                 catch (IOException e) {
