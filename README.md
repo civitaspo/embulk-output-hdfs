@@ -18,7 +18,7 @@ A File Output Plugin for Embulk to write HDFS.
 - **config** overwrites configuration parameters (hash, default: `{}`)
 - **path_prefix** prefix of target files (string, required)
 - **file_ext** suffix of target files (string, required)
-- **sequence_format** format for sequence part of target files (string, default: `'.%03d.%02d'`)
+- **sequence_format** format for sequence part of target files (string, default: `'%03d.%02d.'`)
 - **rewind_seconds** When you use Date format in path_prefix property(like `/tmp/embulk/%Y-%m-%d/out`), the format is interpreted by using the time which is Now minus this property. (int, default: `0`)
 - **overwrite** overwrite files when the same filenames already exists (boolean, default: `false`)
     - *caution*: even if this property is `true`, this does not mean ensuring the idempotence. if you want to ensure the idempotence, you need the procedures to remove output files after or before running. 
