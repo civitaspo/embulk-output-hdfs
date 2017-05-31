@@ -2,8 +2,11 @@ package org.embulk.output.hdfs.client;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.embulk.config.ConfigException;
 import org.embulk.output.hdfs.HdfsFileOutputPlugin;
@@ -197,6 +200,53 @@ public class HdfsClient
                     throws Exception
             {
                 return fs.create(path, overwrite);
+            }
+        });
+    }
+
+    public boolean mkdirs(String path)
+    {
+        return mkdirs(new Path(path));
+    }
+
+    public boolean mkdirs(final Path path)
+    {
+        return run(new Retryable<Boolean>() {
+            @Override
+            public Boolean call()
+                    throws Exception
+            {
+                return fs.mkdirs(path);
+            }
+        });
+    }
+
+    public void close()
+    {
+        run(new Retryable<Void>() {
+            @Override
+            public Void call()
+                    throws Exception
+            {
+                fs.close();
+                return null;
+            }
+        });
+    }
+
+    public boolean swapDirectory(String src, String dst)
+    {
+        return swapDirectory(new Path(src), new Path(dst));
+    }
+
+    public boolean swapDirectory(final Path src, final Path dst)
+    {
+        return run(new Retryable<Boolean>() {
+            @Override
+            public Boolean call()
+                    throws Exception
+            {
+                return FileUtil.copy(fs, src, fs, dst, true, true, conf);
             }
         });
     }
