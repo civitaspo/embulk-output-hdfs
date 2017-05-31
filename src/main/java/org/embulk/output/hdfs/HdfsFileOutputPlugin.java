@@ -1,35 +1,32 @@
 package org.embulk.output.hdfs;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Throwables;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.embulk.config.Config;
 import org.embulk.config.ConfigDefault;
 import org.embulk.config.ConfigDiff;
 import org.embulk.config.ConfigException;
+import org.embulk.config.ConfigInject;
 import org.embulk.config.ConfigSource;
 import org.embulk.config.Task;
 import org.embulk.config.TaskReport;
 import org.embulk.config.TaskSource;
-import org.embulk.spi.Buffer;
+import org.embulk.output.hdfs.client.HdfsClient;
+import org.embulk.output.hdfs.util.SafeWorkspaceName;
+import org.embulk.output.hdfs.util.SamplePath;
+import org.embulk.output.hdfs.util.StrftimeUtil;
+import org.embulk.spi.DataException;
 import org.embulk.spi.Exec;
 import org.embulk.spi.FileOutputPlugin;
 import org.embulk.spi.TransactionalFileOutput;
 import org.jruby.embed.ScriptingContainer;
 import org.slf4j.Logger;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.URI;
-import java.util.ArrayList;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
-import static org.embulk.output.hdfs.HdfsFileOutputPlugin.PluginTask.*;
+import static org.embulk.output.hdfs.HdfsFileOutputPlugin.PluginTask.DeleteInAdvancePolicy;
 
 public class HdfsFileOutputPlugin
         implements FileOutputPlugin
@@ -73,6 +70,50 @@ public class HdfsFileOutputPlugin
         @Config("delete_in_advance")
         @ConfigDefault("\"NONE\"")
         DeleteInAdvancePolicy getDeleteInAdvance();
+
+        @Config("atomic_mode") // TODO: option name
+        @ConfigDefault("false")
+        boolean getAtomicMode();
+
+        @Config("workspace")
+        @ConfigDefault("\"/tmp\"")
+        String getWorkspace();
+
+        String getSafeWorkspace();
+        void setSafeWorkspace(String safeWorkspace);
+
+        @ConfigInject
+        ScriptingContainer getJruby();
+    }
+
+    private void configure(PluginTask task)
+    {
+        HdfsClient hdfsClient = HdfsClient.build(task);
+
+        if (task.getAtomicMode()) {
+            if (task.getSequenceFormat().contains("/")) {
+                throw new ConfigException("Must not include `/` in `sequence_format` if atomic mode."); // TODO
+            }
+            if (!task.getDeleteInAdvance().equals(DeleteInAdvancePolicy.NONE)) {
+                throw new ConfigException("`delete_in_advance` must be `NONE` if atomic mode."); // TODO
+            }
+            if (task.getOverwrite()) {
+                logger.info("Replace directory {} if exists.", sampleDir(task));
+            }
+
+            String safeWorkspace = SafeWorkspaceName.build(task.getWorkspace());
+            logger.info("Use as a workspace: {}", safeWorkspace);
+
+            String safeWsWithOutput = Paths.get(safeWorkspace, sampleDir(task)).toString();
+            logger.debug("The actual workspace must be with output dirs: {}", safeWsWithOutput);
+            if (!hdfsClient.mkdirs(safeWsWithOutput)) {
+                throw new ConfigException(String.format("Failed to make a directory: %s", safeWsWithOutput));
+            }
+            task.setSafeWorkspace(safeWorkspace);
+        }
+
+        String pathPrefix = StrftimeUtil.strftime(task.getPathPrefix(), task.getRewindSeconds());
+        deleteInAdvance(hdfsClient, pathPrefix, task.getDeleteInAdvance());
     }
 
     @Override
@@ -80,15 +121,7 @@ public class HdfsFileOutputPlugin
             FileOutputPlugin.Control control)
     {
         PluginTask task = config.loadConfig(PluginTask.class);
-
-        try {
-            String pathPrefix = strftime(task.getPathPrefix(), task.getRewindSeconds());
-            FileSystem fs = getFs(task);
-            deleteInAdvance(fs, pathPrefix, task.getDeleteInAdvance());
-        }
-        catch (IOException e) {
-            throw Throwables.propagate(e);
-        }
+        configure(task);
 
         control.run(task.dump());
         return Exec.newConfigDiff();
@@ -107,129 +140,56 @@ public class HdfsFileOutputPlugin
             int taskCount,
             List<TaskReport> successTaskReports)
     {
+        PluginTask task = taskSource.loadTask(PluginTask.class);
+        String outputDir = sampleDir(task);
+
+        for (TaskReport successTaskReport : successTaskReports) {
+            List outputPaths = successTaskReport.get(List.class, "output_paths");
+            for (Object path : outputPaths) {
+                if (task.getAtomicMode()) {
+                    logger.info("Move {} to {}", path, outputDir);
+                }
+                else {
+                    logger.info("Created: {}", path);
+                }
+            }
+        }
+
+        if (task.getAtomicMode()) {
+            HdfsClient hdfsClient = HdfsClient.build(task);
+            String safeWsWithOutput = Paths.get(task.getSafeWorkspace(), sampleDir(task)).toString();
+            if (!hdfsClient.swapDirectory(safeWsWithOutput, outputDir)) {
+                throw new DataException(String.format("Failed to swap: src: %s, dst: %s", safeWsWithOutput, outputDir));
+            }
+            logger.info("Swapped: src: {}, dst: {}", safeWsWithOutput, outputDir);
+        }
     }
 
     @Override
-    public TransactionalFileOutput open(TaskSource taskSource, final int taskIndex)
+    public TransactionalFileOutput open(TaskSource taskSource, int taskIndex)
     {
-        final PluginTask task = taskSource.loadTask(PluginTask.class);
-
-        final String pathPrefix = strftime(task.getPathPrefix(), task.getRewindSeconds());
-        final String pathSuffix = task.getFileExt();
-        final String sequenceFormat = task.getSequenceFormat();
-
-        return new TransactionalFileOutput()
-        {
-            private final List<String> hdfsFileNames = new ArrayList<>();
-            private int fileIndex = 0;
-            private Path currentPath = null;
-            private OutputStream output = null;
-
-            @Override
-            public void nextFile()
-            {
-                closeCurrentStream();
-                currentPath = new Path(pathPrefix + String.format(sequenceFormat, taskIndex, fileIndex) + pathSuffix);
-                fileIndex++;
-            }
-
-            @Override
-            public void add(Buffer buffer)
-            {
-                try {
-                    // this implementation is for creating file when there is data.
-                    if (output == null) {
-                        FileSystem fs = getFs(task);
-                        output = fs.create(currentPath, task.getOverwrite());
-                        logger.info("Uploading '{}'", currentPath);
-                        hdfsFileNames.add(currentPath.toString());
-                    }
-                    output.write(buffer.array(), buffer.offset(), buffer.limit());
-                }
-                catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                finally {
-                    buffer.release();
-                }
-            }
-
-            @Override
-            public void finish()
-            {
-                closeCurrentStream();
-            }
-
-            @Override
-            public void close()
-            {
-                closeCurrentStream();
-            }
-
-            @Override
-            public void abort()
-            {
-            }
-
-            @Override
-            public TaskReport commit()
-            {
-                TaskReport report = Exec.newTaskReport();
-                report.set("hdfs_file_names", hdfsFileNames);
-                return report;
-            }
-
-            private void closeCurrentStream()
-            {
-                if (output != null) {
-                    try {
-                        output.close();
-                        output = null;
-                    }
-                    catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            }
-        };
-    }
-
-    private static FileSystem getFs(final PluginTask task)
-            throws IOException
-    {
-        Configuration configuration = new Configuration();
-
-        for (String configFile : task.getConfigFiles()) {
-            File file = new File(configFile);
-            configuration.addResource(file.toURI().toURL());
+        PluginTask task = taskSource.loadTask(PluginTask.class);
+        String pathPrefix;
+        if (task.getAtomicMode()) {
+            pathPrefix = task.getSafeWorkspace();
+        }
+        else {
+            pathPrefix = StrftimeUtil.strftime(task.getPathPrefix(), task.getRewindSeconds());
         }
 
-        for (Map.Entry<String, String> entry: task.getConfig().entrySet()) {
-            configuration.set(entry.getKey(), entry.getValue());
-        }
-
-        if (task.getDoas().isPresent()) {
-            URI uri = FileSystem.getDefaultUri(configuration);
-            try {
-                return FileSystem.get(uri, configuration, task.getDoas().get());
-            }
-            catch (InterruptedException e) {
-                throw Throwables.propagate(e);
-            }
-        }
-        return FileSystem.get(configuration);
+        return new HdfsFileOutput(task, pathPrefix, taskIndex);
     }
 
-    private String strftime(final String raw, final int rewind_seconds)
+    private String sampleDir(PluginTask task)
     {
-        ScriptingContainer jruby = new ScriptingContainer();
-        Object resolved = jruby.runScriptlet(
-                String.format("(Time.now - %s).strftime('%s')", String.valueOf(rewind_seconds), raw));
-        return resolved.toString();
+        String pathPrefix = StrftimeUtil.strftime(task.getPathPrefix(), task.getRewindSeconds());
+        return SamplePath.getDir(pathPrefix, task.getSequenceFormat(), task.getFileExt());
     }
 
-    private void deleteInAdvance(FileSystem fs, String pathPrefix, DeleteInAdvancePolicy deleteInAdvancePolicy)
-            throws IOException
+    private void deleteInAdvance(
+            HdfsClient hdfsClient,
+            String pathPrefix,
+            DeleteInAdvancePolicy deleteInAdvancePolicy)
     {
         final Path globPath = new Path(pathPrefix + "*");
         switch (deleteInAdvancePolicy) {
@@ -237,18 +197,12 @@ public class HdfsFileOutputPlugin
                 // do nothing
                 break;
             case FILE_ONLY:
-                for (FileStatus status : fs.globStatus(globPath)) {
-                    if (status.isFile()) {
-                        logger.debug("delete in advance: {}", status.getPath());
-                        fs.delete(status.getPath(), false);
-                    }
-                }
+                logger.info("Delete {} (File Only) in advance", globPath);
+                hdfsClient.globAndRemove(globPath);
                 break;
             case RECURSIVE:
-                for (FileStatus status : fs.globStatus(globPath)) {
-                    logger.debug("delete in advance: {}", status.getPath());
-                    fs.delete(status.getPath(), true);
-                }
+                logger.info("Delete {} (Recursive) in advance", globPath);
+                hdfsClient.globAndRemoveRecursive(globPath);
                 break;
             default:
                 throw new ConfigException("`delete_in_advance` must not null.");
