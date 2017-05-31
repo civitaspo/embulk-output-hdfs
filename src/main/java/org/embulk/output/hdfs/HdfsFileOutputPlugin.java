@@ -169,15 +169,13 @@ public class HdfsFileOutputPlugin
     public TransactionalFileOutput open(TaskSource taskSource, int taskIndex)
     {
         PluginTask task = taskSource.loadTask(PluginTask.class);
-        String pathPrefix;
+        String pathPrefix = StrftimeUtil.strftime(task.getPathPrefix(), task.getRewindSeconds());;
         if (task.getAtomicMode()) {
-            pathPrefix = task.getSafeWorkspace();
+            return new HdfsFileOutput(task, task.getSafeWorkspace(), pathPrefix, taskIndex);
         }
         else {
-            pathPrefix = StrftimeUtil.strftime(task.getPathPrefix(), task.getRewindSeconds());
+            return new HdfsFileOutput(task, pathPrefix, taskIndex);
         }
-
-        return new HdfsFileOutput(task, pathPrefix, taskIndex);
     }
 
     private String sampleDir(PluginTask task)
