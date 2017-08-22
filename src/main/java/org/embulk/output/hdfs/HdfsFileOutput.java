@@ -23,7 +23,6 @@ public class HdfsFileOutput
             .withRetryLimit(3)
             .withMaxRetryWait(500) // ms
             .withMaxRetryWait(10 * 60 * 1000); // ms
-    private final ImmutableList.Builder<String> outputPaths = ImmutableList.builder();
 
     private final HdfsClient hdfsClient;
     private final int taskIdx;
@@ -59,9 +58,7 @@ public class HdfsFileOutput
     @Override
     public TaskReport commit()
     {
-        TaskReport report = Exec.newTaskReport();
-        report.set("output_paths", outputPaths.build());
-        return report;
+        return Exec.newTaskReport();
     }
 
     @Override
@@ -80,7 +77,6 @@ public class HdfsFileOutput
             if (o == null) {
                 o = hdfsClient.create(currentPath, overwrite);
                 logger.info("Uploading '{}'", currentPath);
-                outputPaths.add(currentPath.toString());
             }
             write(buffer);
         }

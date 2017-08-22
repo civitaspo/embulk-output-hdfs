@@ -15,7 +15,6 @@ import org.embulk.output.hdfs.client.HdfsClient;
 import org.embulk.output.hdfs.util.SafeWorkspaceName;
 import org.embulk.output.hdfs.util.SamplePath;
 import org.embulk.output.hdfs.util.StrftimeUtil;
-import org.embulk.spi.DataException;
 import org.embulk.spi.Exec;
 import org.embulk.spi.FileOutputPlugin;
 import org.embulk.spi.TransactionalFileOutput;
@@ -23,7 +22,6 @@ import org.jruby.embed.ScriptingContainer;
 import org.slf4j.Logger;
 
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -156,22 +154,6 @@ public class HdfsFileOutputPlugin
             int taskCount,
             List<TaskReport> successTaskReports)
     {
-        PluginTask task = taskSource.loadTask(PluginTask.class);
-        String outputDir = getOutputSampleDir(task);
-
-        for (TaskReport successTaskReport : successTaskReports) {
-
-            List outputPaths = successTaskReport.get(List.class, "output_paths");
-            for (Object path : outputPaths) {
-
-                if (task.getAtomicMode()) {
-                    logger.info("Created and Moved: {} >>> {}", path, outputDir);
-                }
-                else {
-                    logger.info("Created: {}", path);
-                }
-            }
-        }
     }
 
     @Override
