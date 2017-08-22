@@ -5,9 +5,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.Trash;
 import org.embulk.config.ConfigException;
 import org.embulk.output.hdfs.HdfsFileOutputPlugin;
 import org.embulk.spi.Exec;
@@ -234,19 +234,28 @@ public class HdfsClient
         });
     }
 
-    public boolean swapDirectory(String src, String dst)
+    public void overwriteDirectory(String src, String dst)
     {
-        return swapDirectory(new Path(src), new Path(dst));
+        overwriteDirectory(new Path(src), new Path(dst));
     }
 
-    public boolean swapDirectory(final Path src, final Path dst)
+    public Void overwriteDirectory(final Path src, final Path dst)
     {
-        return run(new Retryable<Boolean>() {
+        return run(new Retryable<Void>() {
             @Override
-            public Boolean call()
+            public Void call()
                     throws Exception
             {
-                return FileUtil.copy(fs, src, fs, dst, true, true, conf);
+                if (fs.exists(dst)) {
+                    logger.info("Overwrite: {} By {}", dst, src);
+                    if (!new Trash(conf).moveToTrash(dst)) {
+                        throw new IllegalStateException(String.format("Failed to Move %s to Trash", dst.getName()));
+                    }
+                    logger.debug("MoveToTrash: {}", dst);
+                }
+                FileContext.getFileContext(conf).rename(src, dst, Options.Rename.NONE);
+                logger.debug("Move: {} To {}", src, dst);
+                return null;
             }
         });
     }

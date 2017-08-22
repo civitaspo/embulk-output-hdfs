@@ -138,10 +138,8 @@ public class HdfsFileOutputPlugin
         String outputDir = getOutputSampleDir(task);
         String safeWsWithOutput = Paths.get(task.getSafeWorkspace(), getOutputSampleDir(task)).toString();
 
-        if (!hdfsClient.swapDirectory(safeWsWithOutput, outputDir)) {
-            throw new DataException(String.format("Failed to swap: src: %s, dst: %s", safeWsWithOutput, outputDir));
-        }
-        logger.info("Swapped: src: {}, dst: {}", safeWsWithOutput, outputDir);
+        hdfsClient.overwriteDirectory(safeWsWithOutput, outputDir);
+        logger.info("Store {} To {}", safeWsWithOutput, outputDir);
     }
 
     @Override
