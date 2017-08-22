@@ -124,7 +124,24 @@ public class HdfsFileOutputPlugin
         configure(task);
 
         control.run(task.dump());
+
+        if (task.getAtomicMode()) {
+            atomicReplace(task);
+        }
+
         return Exec.newConfigDiff();
+    }
+
+    private void atomicReplace(PluginTask task)
+    {
+        HdfsClient hdfsClient = HdfsClient.build(task);
+        String outputDir = getOutputSampleDir(task);
+        String safeWsWithOutput = Paths.get(task.getSafeWorkspace(), getOutputSampleDir(task)).toString();
+
+        if (!hdfsClient.swapDirectory(safeWsWithOutput, outputDir)) {
+            throw new DataException(String.format("Failed to swap: src: %s, dst: %s", safeWsWithOutput, outputDir));
+        }
+        logger.info("Swapped: src: {}, dst: {}", safeWsWithOutput, outputDir);
     }
 
     @Override
@@ -147,21 +164,12 @@ public class HdfsFileOutputPlugin
             List outputPaths = successTaskReport.get(List.class, "output_paths");
             for (Object path : outputPaths) {
                 if (task.getAtomicMode()) {
-                    logger.info("Move {} to {}", path, outputDir);
+                    logger.info("Created and Moved: {} to {}", path, outputDir);
                 }
                 else {
                     logger.info("Created: {}", path);
                 }
             }
-        }
-
-        if (task.getAtomicMode()) {
-            HdfsClient hdfsClient = HdfsClient.build(task);
-            String safeWsWithOutput = Paths.get(task.getSafeWorkspace(), getOutputSampleDir(task)).toString();
-            if (!hdfsClient.swapDirectory(safeWsWithOutput, outputDir)) {
-                throw new DataException(String.format("Failed to swap: src: %s, dst: %s", safeWsWithOutput, outputDir));
-            }
-            logger.info("Swapped: src: {}, dst: {}", safeWsWithOutput, outputDir);
         }
     }
 
