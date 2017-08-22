@@ -10,6 +10,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Trash;
 import org.embulk.config.ConfigException;
 import org.embulk.output.hdfs.HdfsFileOutputPlugin;
+import org.embulk.spi.DataException;
 import org.embulk.spi.Exec;
 import org.embulk.spi.util.RetryExecutor;
 import org.slf4j.Logger;
@@ -234,12 +235,12 @@ public class HdfsClient
         });
     }
 
-    public void overwriteDirectory(String src, String dst)
+    public void renameDirectory(String src, String dst, boolean overwrite)
     {
-        overwriteDirectory(new Path(src), new Path(dst));
+        renameDirectory(new Path(src), new Path(dst), overwrite);
     }
 
-    public Void overwriteDirectory(final Path src, final Path dst)
+    public Void renameDirectory(final Path src, final Path dst, final boolean overwrite)
     {
         return run(new Retryable<Void>() {
             @Override

@@ -70,9 +70,9 @@ public class HdfsFileOutputPlugin
         @ConfigDefault("\"NONE\"")
         DeleteInAdvancePolicy getDeleteInAdvance();
 
-        @Config("atomic_mode") // TODO: option name
+        @Config("atomic")
         @ConfigDefault("false")
-        boolean getAtomicMode();
+        boolean getAtomic();
 
         @Config("workspace")
         @ConfigDefault("\"/tmp\"")
@@ -89,15 +89,15 @@ public class HdfsFileOutputPlugin
     {
         HdfsClient hdfsClient = HdfsClient.build(task);
 
-        if (task.getAtomicMode()) {
+        if (task.getAtomic()) {
             if (task.getSequenceFormat().contains("/")) {
-                throw new ConfigException("Must not include `/` in `sequence_format` if atomic mode."); // TODO
+                throw new ConfigException("Must not include `/` in `sequence_format` if atomic is true.");
             }
             if (!task.getDeleteInAdvance().equals(DeleteInAdvancePolicy.NONE)) {
-                throw new ConfigException("`delete_in_advance` must be `NONE` if atomic mode."); // TODO
+                throw new ConfigException("`delete_in_advance` must be `NONE` if atomic is true.");
             }
             if (task.getOverwrite()) {
-                logger.info("Replace directory {} if exists.", getOutputSampleDir(task));
+                logger.info("Overwrite directory {} if exists.", getOutputSampleDir(task));
             }
 
             String safeWorkspace = SafeWorkspaceName.build(task.getWorkspace());
@@ -124,20 +124,20 @@ public class HdfsFileOutputPlugin
 
         control.run(task.dump());
 
-        if (task.getAtomicMode()) {
-            atomicReplace(task);
+        if (task.getAtomic()) {
+            atomicRename(task);
         }
 
         return Exec.newConfigDiff();
     }
 
-    private void atomicReplace(PluginTask task)
+    private void atomicRename(PluginTask task)
     {
         HdfsClient hdfsClient = HdfsClient.build(task);
         String outputDir = getOutputSampleDir(task);
         String safeWsWithOutput = Paths.get(task.getSafeWorkspace(), getOutputSampleDir(task)).toString();
 
-        hdfsClient.overwriteDirectory(safeWsWithOutput, outputDir);
+        hdfsClient.renameDirectory(safeWsWithOutput, outputDir, task.getOverwrite());
         logger.info("Store: {} >>> {}", safeWsWithOutput, outputDir);
     }
 
@@ -161,7 +161,7 @@ public class HdfsFileOutputPlugin
     {
         PluginTask task = taskSource.loadTask(PluginTask.class);
         String pathPrefix = StrftimeUtil.strftime(task.getPathPrefix(), task.getRewindSeconds());;
-        if (task.getAtomicMode()) {
+        if (task.getAtomic()) {
             return new HdfsFileOutput(task, task.getSafeWorkspace(), pathPrefix, taskIndex);
         }
         else {
