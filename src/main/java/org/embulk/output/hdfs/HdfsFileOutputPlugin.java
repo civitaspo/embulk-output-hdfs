@@ -98,13 +98,13 @@ public class HdfsFileOutputPlugin
                 throw new ConfigException("`delete_in_advance` must be `NONE` if atomic mode."); // TODO
             }
             if (task.getOverwrite()) {
-                logger.info("Replace directory {} if exists.", sampleDir(task));
+                logger.info("Replace directory {} if exists.", getOutputSampleDir(task));
             }
 
             String safeWorkspace = SafeWorkspaceName.build(task.getWorkspace());
             logger.info("Use as a workspace: {}", safeWorkspace);
 
-            String safeWsWithOutput = Paths.get(safeWorkspace, sampleDir(task)).toString();
+            String safeWsWithOutput = Paths.get(safeWorkspace, getOutputSampleDir(task)).toString();
             logger.debug("The actual workspace must be with output dirs: {}", safeWsWithOutput);
             if (!hdfsClient.mkdirs(safeWsWithOutput)) {
                 throw new ConfigException(String.format("Failed to make a directory: %s", safeWsWithOutput));
@@ -141,7 +141,7 @@ public class HdfsFileOutputPlugin
             List<TaskReport> successTaskReports)
     {
         PluginTask task = taskSource.loadTask(PluginTask.class);
-        String outputDir = sampleDir(task);
+        String outputDir = getOutputSampleDir(task);
 
         for (TaskReport successTaskReport : successTaskReports) {
             List outputPaths = successTaskReport.get(List.class, "output_paths");
@@ -157,7 +157,7 @@ public class HdfsFileOutputPlugin
 
         if (task.getAtomicMode()) {
             HdfsClient hdfsClient = HdfsClient.build(task);
-            String safeWsWithOutput = Paths.get(task.getSafeWorkspace(), sampleDir(task)).toString();
+            String safeWsWithOutput = Paths.get(task.getSafeWorkspace(), getOutputSampleDir(task)).toString();
             if (!hdfsClient.swapDirectory(safeWsWithOutput, outputDir)) {
                 throw new DataException(String.format("Failed to swap: src: %s, dst: %s", safeWsWithOutput, outputDir));
             }
@@ -178,7 +178,7 @@ public class HdfsFileOutputPlugin
         }
     }
 
-    private String sampleDir(PluginTask task)
+    private String getOutputSampleDir(PluginTask task)
     {
         String pathPrefix = StrftimeUtil.strftime(task.getPathPrefix(), task.getRewindSeconds());
         return SamplePath.getDir(pathPrefix, task.getSequenceFormat(), task.getFileExt());
