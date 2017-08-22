@@ -248,6 +248,9 @@ public class HdfsClient
                     throws Exception
             {
                 if (fs.exists(dst)) {
+                    if (!overwrite) {
+                        throw new DataException(String.format("Directory Exists: %s", dst.toString()));
+                    }
                     logger.info("Overwrite: {} >>> {}", src, dst);
                     if (!new Trash(conf).moveToTrash(dst)) {
                         throw new IllegalStateException(String.format("Failed to MoveToTrash: %s", dst.toString()));
