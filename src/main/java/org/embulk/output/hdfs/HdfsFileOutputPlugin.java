@@ -23,6 +23,7 @@ import org.jruby.embed.ScriptingContainer;
 import org.slf4j.Logger;
 
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -139,7 +140,7 @@ public class HdfsFileOutputPlugin
         String safeWsWithOutput = Paths.get(task.getSafeWorkspace(), getOutputSampleDir(task)).toString();
 
         hdfsClient.overwriteDirectory(safeWsWithOutput, outputDir);
-        logger.info("Store {} To {}", safeWsWithOutput, outputDir);
+        logger.info("Store: {} >>> {}", safeWsWithOutput, outputDir);
     }
 
     @Override
@@ -159,10 +160,12 @@ public class HdfsFileOutputPlugin
         String outputDir = getOutputSampleDir(task);
 
         for (TaskReport successTaskReport : successTaskReports) {
+
             List outputPaths = successTaskReport.get(List.class, "output_paths");
             for (Object path : outputPaths) {
+
                 if (task.getAtomicMode()) {
-                    logger.info("Created and Moved: {} to {}", path, outputDir);
+                    logger.info("Created and Moved: {} >>> {}", path, outputDir);
                 }
                 else {
                     logger.info("Created: {}", path);

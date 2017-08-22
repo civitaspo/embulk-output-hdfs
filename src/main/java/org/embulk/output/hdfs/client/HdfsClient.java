@@ -247,14 +247,14 @@ public class HdfsClient
                     throws Exception
             {
                 if (fs.exists(dst)) {
-                    logger.info("Overwrite: {} By {}", dst, src);
+                    logger.info("Overwrite: {} >>> {}", src, dst);
                     if (!new Trash(conf).moveToTrash(dst)) {
-                        throw new IllegalStateException(String.format("Failed to Move %s to Trash", dst.getName()));
+                        throw new IllegalStateException(String.format("Failed to MoveToTrash: %s", dst.toString()));
                     }
                     logger.debug("MoveToTrash: {}", dst);
                 }
                 FileContext.getFileContext(conf).rename(src, dst, Options.Rename.NONE);
-                logger.debug("Move: {} To {}", src, dst);
+                logger.debug("Move: {} >>> {}", src, dst);
                 return null;
             }
         });
