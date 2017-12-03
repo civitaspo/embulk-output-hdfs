@@ -1,35 +1,24 @@
 package org.embulk.output.hdfs;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Throwables;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.embulk.config.Config;
 import org.embulk.config.ConfigDefault;
 import org.embulk.config.ConfigDiff;
-import org.embulk.config.ConfigException;
 import org.embulk.config.ConfigSource;
 import org.embulk.config.Task;
 import org.embulk.config.TaskReport;
 import org.embulk.config.TaskSource;
-import org.embulk.spi.Buffer;
+import org.embulk.output.hdfs.ModeTask.Mode;
+import org.embulk.output.hdfs.compat.ModeCompat;
+import org.embulk.output.hdfs.transaction.ControlRun;
+import org.embulk.output.hdfs.transaction.Tx;
 import org.embulk.spi.Exec;
 import org.embulk.spi.FileOutputPlugin;
 import org.embulk.spi.TransactionalFileOutput;
-import org.jruby.embed.ScriptingContainer;
 import org.slf4j.Logger;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import static org.embulk.output.hdfs.HdfsFileOutputPlugin.PluginTask.*;
 
 public class HdfsFileOutputPlugin
         implements FileOutputPlugin
@@ -37,7 +26,7 @@ public class HdfsFileOutputPlugin
     private static final Logger logger = Exec.getLogger(HdfsFileOutputPlugin.class);
 
     public interface PluginTask
-            extends Task
+            extends Task, ModeTask
     {
         @Config("config_files")
         @ConfigDefault("[]")
@@ -61,37 +50,66 @@ public class HdfsFileOutputPlugin
         @ConfigDefault("0")
         int getRewindSeconds();
 
+        @Deprecated  // Please Use `mode` option
         @Config("overwrite")
-        @ConfigDefault("false")
-        boolean getOverwrite();
+        @ConfigDefault("null")
+        Optional<Boolean> getOverwrite();
 
         @Config("doas")
         @ConfigDefault("null")
         Optional<String> getDoas();
 
-        enum DeleteInAdvancePolicy{ NONE, FILE_ONLY, RECURSIVE}
+        @Deprecated
+        enum DeleteInAdvancePolicy
+        {
+            NONE, FILE_ONLY, RECURSIVE
+        }
+
+        @Deprecated  // Please Use `mode` option
         @Config("delete_in_advance")
-        @ConfigDefault("\"NONE\"")
-        DeleteInAdvancePolicy getDeleteInAdvance();
+        @ConfigDefault("null")
+        Optional<DeleteInAdvancePolicy> getDeleteInAdvance();
+
+        @Config("workspace")
+        @ConfigDefault("\"/tmp\"")
+        String getWorkspace();
+
+        String getSafeWorkspace();
+        void setSafeWorkspace(String safeWorkspace);
+    }
+
+    private void compat(PluginTask task)
+    {
+        Mode modeCompat = ModeCompat.getMode(task, task.getOverwrite(), task.getDeleteInAdvance());
+        task.setMode(modeCompat);
+    }
+
+    // NOTE: This is to avoid the following error.
+    // Error: java.lang.RuntimeException: com.fasterxml.jackson.databind.JsonMappingException: Field 'SafeWorkspace' is required but not set
+    //  at [Source: N/A; line: -1, column: -1]
+    private void avoidDatabindError(PluginTask task)
+    {
+        // Set default value
+        task.setSafeWorkspace("");
     }
 
     @Override
     public ConfigDiff transaction(ConfigSource config, int taskCount,
-            FileOutputPlugin.Control control)
+            final FileOutputPlugin.Control control)
     {
-        PluginTask task = config.loadConfig(PluginTask.class);
+        final PluginTask task = config.loadConfig(PluginTask.class);
+        compat(task);
+        avoidDatabindError(task);
 
-        try {
-            String pathPrefix = strftime(task.getPathPrefix(), task.getRewindSeconds());
-            FileSystem fs = getFs(task);
-            deleteInAdvance(fs, pathPrefix, task.getDeleteInAdvance());
-        }
-        catch (IOException e) {
-            throw Throwables.propagate(e);
-        }
-
-        control.run(task.dump());
-        return Exec.newConfigDiff();
+        Tx tx = task.getMode().newTx();
+        return tx.transaction(task, new ControlRun()
+        {
+            @Override
+            public List<TaskReport> run()
+            {
+                return control.run(task.dump());
+            }
+        });
     }
 
     @Override
@@ -110,148 +128,10 @@ public class HdfsFileOutputPlugin
     }
 
     @Override
-    public TransactionalFileOutput open(TaskSource taskSource, final int taskIndex)
+    public TransactionalFileOutput open(TaskSource taskSource, int taskIndex)
     {
-        final PluginTask task = taskSource.loadTask(PluginTask.class);
-
-        final String pathPrefix = strftime(task.getPathPrefix(), task.getRewindSeconds());
-        final String pathSuffix = task.getFileExt();
-        final String sequenceFormat = task.getSequenceFormat();
-
-        return new TransactionalFileOutput()
-        {
-            private final List<String> hdfsFileNames = new ArrayList<>();
-            private int fileIndex = 0;
-            private Path currentPath = null;
-            private OutputStream output = null;
-
-            @Override
-            public void nextFile()
-            {
-                closeCurrentStream();
-                currentPath = new Path(pathPrefix + String.format(sequenceFormat, taskIndex, fileIndex) + pathSuffix);
-                fileIndex++;
-            }
-
-            @Override
-            public void add(Buffer buffer)
-            {
-                try {
-                    // this implementation is for creating file when there is data.
-                    if (output == null) {
-                        FileSystem fs = getFs(task);
-                        output = fs.create(currentPath, task.getOverwrite());
-                        logger.info("Uploading '{}'", currentPath);
-                        hdfsFileNames.add(currentPath.toString());
-                    }
-                    output.write(buffer.array(), buffer.offset(), buffer.limit());
-                }
-                catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                finally {
-                    buffer.release();
-                }
-            }
-
-            @Override
-            public void finish()
-            {
-                closeCurrentStream();
-            }
-
-            @Override
-            public void close()
-            {
-                closeCurrentStream();
-            }
-
-            @Override
-            public void abort()
-            {
-            }
-
-            @Override
-            public TaskReport commit()
-            {
-                TaskReport report = Exec.newTaskReport();
-                report.set("hdfs_file_names", hdfsFileNames);
-                return report;
-            }
-
-            private void closeCurrentStream()
-            {
-                if (output != null) {
-                    try {
-                        output.close();
-                        output = null;
-                    }
-                    catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            }
-        };
-    }
-
-    private static FileSystem getFs(final PluginTask task)
-            throws IOException
-    {
-        Configuration configuration = new Configuration();
-
-        for (String configFile : task.getConfigFiles()) {
-            File file = new File(configFile);
-            configuration.addResource(file.toURI().toURL());
-        }
-
-        for (Map.Entry<String, String> entry: task.getConfig().entrySet()) {
-            configuration.set(entry.getKey(), entry.getValue());
-        }
-
-        if (task.getDoas().isPresent()) {
-            URI uri = FileSystem.getDefaultUri(configuration);
-            try {
-                return FileSystem.get(uri, configuration, task.getDoas().get());
-            }
-            catch (InterruptedException e) {
-                throw Throwables.propagate(e);
-            }
-        }
-        return FileSystem.get(configuration);
-    }
-
-    private String strftime(final String raw, final int rewind_seconds)
-    {
-        ScriptingContainer jruby = new ScriptingContainer();
-        Object resolved = jruby.runScriptlet(
-                String.format("(Time.now - %s).strftime('%s')", String.valueOf(rewind_seconds), raw));
-        return resolved.toString();
-    }
-
-    private void deleteInAdvance(FileSystem fs, String pathPrefix, DeleteInAdvancePolicy deleteInAdvancePolicy)
-            throws IOException
-    {
-        final Path globPath = new Path(pathPrefix + "*");
-        switch (deleteInAdvancePolicy) {
-            case NONE:
-                // do nothing
-                break;
-            case FILE_ONLY:
-                for (FileStatus status : fs.globStatus(globPath)) {
-                    if (status.isFile()) {
-                        logger.debug("delete in advance: {}", status.getPath());
-                        fs.delete(status.getPath(), false);
-                    }
-                }
-                break;
-            case RECURSIVE:
-                for (FileStatus status : fs.globStatus(globPath)) {
-                    logger.debug("delete in advance: {}", status.getPath());
-                    fs.delete(status.getPath(), true);
-                }
-                break;
-            default:
-                throw new ConfigException("`delete_in_advance` must not null.");
-        }
+        PluginTask task = taskSource.loadTask(PluginTask.class);
+        Tx tx = task.getMode().newTx();
+        return tx.newOutput(task, taskSource, taskIndex);
     }
 }

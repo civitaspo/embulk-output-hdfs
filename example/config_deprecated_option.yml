@@ -6,14 +6,12 @@ hdfs_example: &hdfs_example
     fs.defaultFS: 'hdfs://hadoop-nn1:8020'
     fs.hdfs.impl: 'org.apache.hadoop.hdfs.DistributedFileSystem'
     fs.file.impl: 'org.apache.hadoop.fs.LocalFileSystem'
-    fs.trash.interval: 3600
 
 local_fs_example: &local_fs_example
   config:
     fs.defaultFS: 'file:///'
     fs.hdfs.impl: 'org.apache.hadoop.fs.RawLocalFileSystem'
     fs.file.impl: 'org.apache.hadoop.fs.RawLocalFileSystem'
-    fs.trash.interval: 3600
     io.compression.codecs: 'org.apache.hadoop.io.compress.GzipCodec,org.apache.hadoop.io.compress.DefaultCodec,org.apache.hadoop.io.compress.BZip2Codec'
 
 in:
@@ -40,7 +38,7 @@ out:
   <<: *local_fs_example
   path_prefix: /tmp/embulk-output-hdfs_example/file_
   file_ext: csv
-  mode: replace
+  delete_in_advance: FILE_ONLY
   formatter:
     type: csv
     newline: CRLF
