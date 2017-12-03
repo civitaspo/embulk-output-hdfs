@@ -1,8 +1,8 @@
 package org.embulk.output.hdfs;
 
-import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.fs.Path;
 import org.embulk.config.TaskReport;
+import org.embulk.output.hdfs.HdfsFileOutputPlugin.PluginTask;
 import org.embulk.output.hdfs.client.HdfsClient;
 import org.embulk.spi.Buffer;
 import org.embulk.spi.Exec;
@@ -13,7 +13,6 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.file.Paths;
 
 public class HdfsFileOutput
         implements FileOutput, TransactionalFileOutput
@@ -35,19 +34,14 @@ public class HdfsFileOutput
     private Path currentPath = null;
     private OutputStream o = null;
 
-    HdfsFileOutput(HdfsFileOutputPlugin.PluginTask task, String pathPrefix, int taskIdx)
+    public HdfsFileOutput(PluginTask task, String pathPrefix, boolean overwrite, int taskIdx)
     {
         this.hdfsClient = HdfsClient.build(task);
         this.pathPrefix = pathPrefix;
         this.taskIdx = taskIdx;
         this.sequenceFormat = task.getSequenceFormat();
         this.fileExt = task.getFileExt();
-        this.overwrite = task.getOverwrite();
-    }
-
-    HdfsFileOutput(HdfsFileOutputPlugin.PluginTask task, String workspace, String pathPrefix, int taskIdx)
-    {
-        this(task, Paths.get(workspace, pathPrefix).toString(), taskIdx);
+        this.overwrite = overwrite;
     }
 
     @Override

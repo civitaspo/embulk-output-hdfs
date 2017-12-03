@@ -28,7 +28,9 @@ public class HdfsClient
     {
         Configuration conf = buildConfiguration(task.getConfigFiles(), task.getConfig());
         return new HdfsClient(conf, task.getDoas());
-    };
+    }
+
+    ;
 
     public static Configuration buildConfiguration(List<String> configFiles, Map<String, String> configs)
     {
@@ -91,10 +93,9 @@ public class HdfsClient
                 throws RetryExecutor.RetryGiveupException
         {
         }
-
     }
 
-    private <T>T run(Retryable<T> retryable)
+    private <T> T run(Retryable<T> retryable)
     {
         try {
             return re.run(retryable);
@@ -116,7 +117,8 @@ public class HdfsClient
 
     private FileSystem getFs(final Configuration conf, final String user)
     {
-        return run(new Retryable<FileSystem>() {
+        return run(new Retryable<FileSystem>()
+        {
             @Override
             public FileSystem call()
                     throws Exception
@@ -129,7 +131,8 @@ public class HdfsClient
 
     private FileSystem getFs(final Configuration conf)
     {
-        return run(new Retryable<FileSystem>() {
+        return run(new Retryable<FileSystem>()
+        {
             @Override
             public FileSystem call()
                     throws Exception
@@ -212,7 +215,8 @@ public class HdfsClient
 
     public boolean mkdirs(final Path path)
     {
-        return run(new Retryable<Boolean>() {
+        return run(new Retryable<Boolean>()
+        {
             @Override
             public Boolean call()
                     throws Exception
@@ -224,7 +228,8 @@ public class HdfsClient
 
     public void close()
     {
-        run(new Retryable<Void>() {
+        run(new Retryable<Void>()
+        {
             @Override
             public Void call()
                     throws Exception
@@ -235,30 +240,30 @@ public class HdfsClient
         });
     }
 
-    public void renameDirectory(String src, String dst, boolean overwrite)
+    public void renameDirectory(String src, String dst, boolean trashIfExists)
     {
-        renameDirectory(new Path(src), new Path(dst), overwrite);
+        renameDirectory(new Path(src), new Path(dst), trashIfExists);
     }
 
-    public Void renameDirectory(final Path src, final Path dst, final boolean overwrite)
+    public void renameDirectory(final Path src, final Path dst, final boolean trashIfExists)
     {
-        return run(new Retryable<Void>() {
+        run(new Retryable<Void>()
+        {
             @Override
             public Void call()
                     throws Exception
             {
                 if (fs.exists(dst)) {
-                    if (!overwrite) {
+                    if (!trashIfExists) {
                         throw new DataException(String.format("Directory Exists: %s", dst.toString()));
                     }
-                    logger.info("Overwrite: {} >>> {}", src, dst);
-                    if (!new Trash(conf).moveToTrash(dst)) {
-                        throw new IllegalStateException(String.format("Failed to MoveToTrash: %s", dst.toString()));
+                    logger.info("Move To Trash: {}", dst);
+                    if (!new Trash(fs, conf).moveToTrash(dst)) {
+                        throw new IllegalStateException(String.format("Failed to Move To Trash: %s", dst.toString()));
                     }
-                    logger.debug("MoveToTrash: {}", dst);
                 }
                 FileContext.getFileContext(conf).rename(src, dst, Options.Rename.NONE);
-                logger.debug("Move: {} >>> {}", src, dst);
+                logger.debug("Rename: {} >>> {}", src, dst);
                 return null;
             }
         });

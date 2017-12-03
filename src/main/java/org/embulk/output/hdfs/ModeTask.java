@@ -26,7 +26,7 @@ public interface ModeTask
         extends Task
 {
     @Config("mode")
-    @ConfigDefault("abort_if_exist")
+    @ConfigDefault("\"abort_if_exist\"")
     Mode getMode();
     void setMode(Mode mode);
 

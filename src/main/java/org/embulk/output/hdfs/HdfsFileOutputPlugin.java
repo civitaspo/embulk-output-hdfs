@@ -1,35 +1,24 @@
 package org.embulk.output.hdfs;
 
 import com.google.common.base.Optional;
-import org.apache.hadoop.fs.Path;
 import org.embulk.config.Config;
 import org.embulk.config.ConfigDefault;
 import org.embulk.config.ConfigDiff;
-import org.embulk.config.ConfigException;
-import org.embulk.config.ConfigInject;
 import org.embulk.config.ConfigSource;
 import org.embulk.config.Task;
 import org.embulk.config.TaskReport;
 import org.embulk.config.TaskSource;
 import org.embulk.output.hdfs.ModeTask.Mode;
-import org.embulk.output.hdfs.client.HdfsClient;
 import org.embulk.output.hdfs.compat.ModeCompat;
-import org.embulk.output.hdfs.util.SafeWorkspaceName;
-import org.embulk.output.hdfs.util.SamplePath;
-import org.embulk.output.hdfs.util.StrftimeUtil;
+import org.embulk.output.hdfs.transaction.ControlRun;
+import org.embulk.output.hdfs.transaction.Tx;
 import org.embulk.spi.Exec;
 import org.embulk.spi.FileOutputPlugin;
 import org.embulk.spi.TransactionalFileOutput;
-import org.jruby.embed.ScriptingContainer;
 import org.slf4j.Logger;
 
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
-
-import static org.embulk.output.hdfs.HdfsFileOutputPlugin.PluginTask.DeleteInAdvancePolicy;
-import static org.embulk.output.hdfs.ModeTask.Mode.REPLACE;
-import static org.embulk.output.hdfs.compat.ModeCompat.getMode;
 
 public class HdfsFileOutputPlugin
         implements FileOutputPlugin
@@ -83,65 +72,38 @@ public class HdfsFileOutputPlugin
 
         String getSafeWorkspace();
         void setSafeWorkspace(String safeWorkspace);
-
-        @ConfigInject
-        ScriptingContainer getJruby();
     }
 
-    private void configure(PluginTask task)
+    private void compat(PluginTask task)
     {
-        HdfsClient hdfsClient = HdfsClient.build(task);
+        Mode modeCompat = ModeCompat.getMode(task, task.getOverwrite(), task.getDeleteInAdvance());
+        task.setMode(modeCompat);
+    }
 
-        if (task.getAtomic()) {
-            if (task.getSequenceFormat().contains("/")) {
-                throw new ConfigException("Must not include `/` in `sequence_format` if atomic is true.");
-            }
-            if (!task.getDeleteInAdvance().equals(DeleteInAdvancePolicy.NONE)) {
-                throw new ConfigException("`delete_in_advance` must be `NONE` if atomic is true.");
-            }
-            if (task.getOverwrite()) {
-                logger.info("Overwrite directory {} if exists.", getOutputSampleDir(task));
-            }
-
-            String safeWorkspace = SafeWorkspaceName.build(task.getWorkspace());
-            logger.info("Use as a workspace: {}", safeWorkspace);
-
-            String safeWsWithOutput = Paths.get(safeWorkspace, getOutputSampleDir(task)).toString();
-            logger.debug("The actual workspace must be with output dirs: {}", safeWsWithOutput);
-            if (!hdfsClient.mkdirs(safeWsWithOutput)) {
-                throw new ConfigException(String.format("Failed to make a directory: %s", safeWsWithOutput));
-            }
-            task.setSafeWorkspace(safeWorkspace);
-        }
-
-        String pathPrefix = StrftimeUtil.strftime(task.getPathPrefix(), task.getRewindSeconds());
-        deleteInAdvance(hdfsClient, pathPrefix, task.getDeleteInAdvance());
+    // NOTE: This is to avoid the following error.
+    // Error: java.lang.RuntimeException: com.fasterxml.jackson.databind.JsonMappingException: Field 'SafeWorkspace' is required but not set
+    //  at [Source: N/A; line: -1, column: -1]
+    private void avoidDatabindError(PluginTask task)
+    {
+        task.setSafeWorkspace(task.getWorkspace());
     }
 
     @Override
     public ConfigDiff transaction(ConfigSource config, int taskCount,
-            FileOutputPlugin.Control control)
+            final FileOutputPlugin.Control control)
     {
-        PluginTask task = config.loadConfig(PluginTask.class);
-        configure(task);
+        final PluginTask task = config.loadConfig(PluginTask.class);
+        compat(task);
+        avoidDatabindError(task);
 
-        control.run(task.dump());
-
-        if (task.getAtomic()) {
-            atomicRename(task);
-        }
-
-        return Exec.newConfigDiff();
-    }
-
-    private void atomicRename(PluginTask task)
-    {
-        HdfsClient hdfsClient = HdfsClient.build(task);
-        String outputDir = getOutputSampleDir(task);
-        String safeWsWithOutput = Paths.get(task.getSafeWorkspace(), getOutputSampleDir(task)).toString();
-
-        hdfsClient.renameDirectory(safeWsWithOutput, outputDir, task.getOverwrite());
-        logger.info("Store: {} >>> {}", safeWsWithOutput, outputDir);
+        Tx tx = task.getMode().newTx();
+        return tx.transaction(task, new ControlRun() {
+            @Override
+            public List<TaskReport> run()
+            {
+                return control.run(task.dump());
+            }
+        });
     }
 
     @Override
@@ -163,41 +125,7 @@ public class HdfsFileOutputPlugin
     public TransactionalFileOutput open(TaskSource taskSource, int taskIndex)
     {
         PluginTask task = taskSource.loadTask(PluginTask.class);
-        String pathPrefix = StrftimeUtil.strftime(task.getPathPrefix(), task.getRewindSeconds());;
-        if (task.getAtomic()) {
-            return new HdfsFileOutput(task, task.getSafeWorkspace(), pathPrefix, taskIndex);
-        }
-        else {
-            return new HdfsFileOutput(task, pathPrefix, taskIndex);
-        }
-    }
-
-    private String getOutputSampleDir(PluginTask task)
-    {
-        String pathPrefix = StrftimeUtil.strftime(task.getPathPrefix(), task.getRewindSeconds());
-        return SamplePath.getDir(pathPrefix, task.getSequenceFormat(), task.getFileExt());
-    }
-
-    private void deleteInAdvance(
-            HdfsClient hdfsClient,
-            String pathPrefix,
-            DeleteInAdvancePolicy deleteInAdvancePolicy)
-    {
-        final Path globPath = new Path(pathPrefix + "*");
-        switch (deleteInAdvancePolicy) {
-            case NONE:
-                // do nothing
-                break;
-            case FILE_ONLY:
-                logger.info("Delete {} (File Only) in advance", globPath);
-                hdfsClient.globAndRemove(globPath);
-                break;
-            case RECURSIVE:
-                logger.info("Delete {} (Recursive) in advance", globPath);
-                hdfsClient.globAndRemoveRecursive(globPath);
-                break;
-            default:
-                throw new ConfigException("`delete_in_advance` must not null.");
-        }
+        Tx tx = task.getMode().newTx();
+        return tx.newOutput(task, taskSource, taskIndex);
     }
 }
