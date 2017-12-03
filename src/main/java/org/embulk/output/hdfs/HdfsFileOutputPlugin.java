@@ -75,7 +75,6 @@ public class HdfsFileOutputPlugin
         String getWorkspace();
 
         String getSafeWorkspace();
-
         void setSafeWorkspace(String safeWorkspace);
     }
 
@@ -90,7 +89,8 @@ public class HdfsFileOutputPlugin
     //  at [Source: N/A; line: -1, column: -1]
     private void avoidDatabindError(PluginTask task)
     {
-        task.setSafeWorkspace(task.getWorkspace());
+        // Set default value
+        task.setSafeWorkspace("");
     }
 
     @Override
