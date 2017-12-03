@@ -219,7 +219,7 @@ public class TestHdfsFileOutputPlugin
     }
 
     @Test
-    public void testDeleteRECURSIVEInAdvance()
+    public void testDeleteInAdvance_RECURSIVE()
             throws IOException
     {
         for (int n = 0; n <= 10; n++) {
@@ -249,7 +249,7 @@ public class TestHdfsFileOutputPlugin
     }
 
     @Test
-    public void testDeleteFILE_ONLYInAdvance()
+    public void testDeleteInAdvance_FILE_ONLY()
             throws IOException
     {
         for (int n = 0; n <= 10; n++) {
