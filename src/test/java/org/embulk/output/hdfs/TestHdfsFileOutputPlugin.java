@@ -4,6 +4,7 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.embulk.EmbulkTestRuntime;
 import org.embulk.config.ConfigException;
 import org.embulk.config.ConfigSource;
@@ -17,6 +18,7 @@ import org.embulk.spi.PageTestUtils;
 import org.embulk.spi.Schema;
 import org.embulk.spi.TransactionalPageOutput;
 import org.embulk.spi.time.Timestamp;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -37,9 +39,11 @@ import static org.embulk.spi.type.Types.*;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.CoreMatchers.not;
+import static org.hamcrest.core.Is.isA;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.msgpack.value.ValueFactory.newMap;
 import static org.msgpack.value.ValueFactory.newString;
 
@@ -117,6 +121,14 @@ public class TestHdfsFileOutputPlugin
     {
         ConfigSource config = Exec.newConfigSource();
         PluginTask task = config.loadConfig(PluginTask.class);
+    }
+
+    @Test(expected = ConfigException.class)
+    public void testSequenceFormatMode_replace()
+    {
+        run(getBaseConfigSource()
+                .set("mode", "replace")
+                .set("sequence_format", "%d/%d"));
     }
 
     private List<String> lsR(List<String> names, java.nio.file.Path dir)
@@ -272,6 +284,125 @@ public class TestHdfsFileOutputPlugin
         assertNotEquals(fileListBeforeRun, fileListAfterRun);
         assertThat(fileListAfterRun, not(hasItem(containsString("txt"))));
         assertThat(fileListAfterRun, hasItem(containsString("embulk-output-hdfs_testDeleteInAdvance_FILE_ONLY_directory_")));
+        assertThat(fileListAfterRun, hasItem(containsString(pathPrefix + "001.00.csv")));
+        assertRecordsInFile(String.format("%s/%s001.00.csv",
+                tmpFolder.getRoot().getAbsolutePath(),
+                pathPrefix));
+    }
+
+    @Test
+    public void testMode_delete_recursive_in_advance()
+            throws IOException
+    {
+        for (int n = 0; n <= 10; n++) {
+            tmpFolder.newFile("embulk-output-hdfs_testMode_delete_recursive_in_advance_file_" + n + ".txt");
+            tmpFolder.newFolder("embulk-output-hdfs_testMode_delete_recursive_in_advance_directory_" + n);
+        }
+
+        List<String> fileListBeforeRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
+
+        ConfigSource config = getBaseConfigSource()
+                .setNested("config", getDefaultFsConfig())
+                .set("mode", "delete_recursive_in_advance");
+
+        run(config);
+
+        List<String> fileListAfterRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
+        assertNotEquals(fileListBeforeRun, fileListAfterRun);
+        assertThat(fileListAfterRun, not(hasItem(containsString("embulk-output-hdfs_testMode_delete_recursive_in_advance_directory_"))));
+        assertThat(fileListAfterRun, not(hasItem(containsString("txt"))));
+        assertThat(fileListAfterRun, hasItem(containsString(pathPrefix + "001.00.csv")));
+        assertRecordsInFile(String.format("%s/%s001.00.csv",
+                tmpFolder.getRoot().getAbsolutePath(),
+                pathPrefix));
+    }
+
+    @Test
+    public void testMode_delete_files_in_advance()
+            throws IOException
+    {
+        for (int n = 0; n <= 10; n++) {
+            tmpFolder.newFile("embulk-output-hdfs_testMode_delete_files_in_advance_file_" + n + ".txt");
+            tmpFolder.newFolder("embulk-output-hdfs_testMode_delete_files_in_advance_directory_" + n);
+        }
+
+        List<String> fileListBeforeRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
+
+        ConfigSource config = getBaseConfigSource()
+                .setNested("config", getDefaultFsConfig())
+                .set("mode", "delete_files_in_advance");
+
+        run(config);
+
+        List<String> fileListAfterRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
+        assertNotEquals(fileListBeforeRun, fileListAfterRun);
+        assertThat(fileListAfterRun, not(hasItem(containsString("txt"))));
+        assertThat(fileListAfterRun, hasItem(containsString("embulk-output-hdfs_testMode_delete_files_in_advance_directory_")));
+        assertThat(fileListAfterRun, hasItem(containsString(pathPrefix + "001.00.csv")));
+        assertRecordsInFile(String.format("%s/%s001.00.csv",
+                tmpFolder.getRoot().getAbsolutePath(),
+                pathPrefix));
+    }
+
+    @Test
+    public void testMode_abort_if_exist()
+            throws IOException
+    {
+        ConfigSource config = getBaseConfigSource()
+                .setNested("config", getDefaultFsConfig())
+                .set("mode", "abort_if_exist");
+
+        run(config);
+        try {
+            run(config);
+        }
+        catch (Exception e) {
+            Throwable t = e;
+            while (t != null) {
+                t = t.getCause();
+                if (t.getCause() instanceof FileAlreadyExistsException) {
+                    Assert.assertTrue(true);
+                    return;
+                }
+            }
+            Assert.fail("FileAlreadyExistsException is not cause.");
+        }
+
+    }
+
+    @Test
+    public void testMode_overwrite()
+            throws IOException
+    {
+        ConfigSource config = getBaseConfigSource()
+                .setNested("config", getDefaultFsConfig())
+                .set("mode", "overwrite");
+
+        run(config);
+        run(config);
+        Assert.assertTrue(true);
+    }
+
+    @Test
+    public void testMode_replace()
+            throws IOException
+    {
+        for (int n = 0; n <= 10; n++) {
+            tmpFolder.newFile("embulk-output-hdfs_testMode_delete_recursive_in_advance_file_" + n + ".txt");
+            tmpFolder.newFolder("embulk-output-hdfs_testMode_delete_recursive_in_advance_directory_" + n);
+        }
+
+        List<String> fileListBeforeRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
+
+
+        run(getBaseConfigSource()
+                .set("config", getDefaultFsConfig())
+                .set("mode", "replace"));
+
+        List<String> fileListAfterRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
+        assertNotEquals(fileListBeforeRun, fileListAfterRun);
+        assertThat(fileListAfterRun, not(hasItem(containsString("embulk-output-hdfs_testMode_delete_recursive_in_advance_directory_"))));
+        assertThat(fileListAfterRun, not(hasItem(containsString("txt"))));
         assertThat(fileListAfterRun, hasItem(containsString(pathPrefix + "001.00.csv")));
         assertRecordsInFile(String.format("%s/%s001.00.csv",
                 tmpFolder.getRoot().getAbsolutePath(),
