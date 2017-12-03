@@ -60,7 +60,11 @@ public class HdfsFileOutputPlugin
         Optional<String> getDoas();
 
         @Deprecated
-        enum DeleteInAdvancePolicy{ NONE, FILE_ONLY, RECURSIVE}
+        enum DeleteInAdvancePolicy
+        {
+            NONE, FILE_ONLY, RECURSIVE
+        }
+
         @Deprecated  // Please Use `mode` option
         @Config("delete_in_advance")
         @ConfigDefault("null")
@@ -71,6 +75,7 @@ public class HdfsFileOutputPlugin
         String getWorkspace();
 
         String getSafeWorkspace();
+
         void setSafeWorkspace(String safeWorkspace);
     }
 
@@ -97,7 +102,8 @@ public class HdfsFileOutputPlugin
         avoidDatabindError(task);
 
         Tx tx = task.getMode().newTx();
-        return tx.transaction(task, new ControlRun() {
+        return tx.transaction(task, new ControlRun()
+        {
             @Override
             public List<TaskReport> run()
             {

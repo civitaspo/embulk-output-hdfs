@@ -45,7 +45,6 @@ public class ModeCompat
             throw new ConfigException(msg);
         }
 
-
         // Select Mode for Compatibility
         if (!deleteInAdvancePolicy.isPresent()) {
             if (overwrite.get()) {

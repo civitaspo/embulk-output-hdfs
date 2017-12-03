@@ -80,7 +80,6 @@ public class HdfsFileOutput
         finally {
             buffer.release();
         }
-
     }
 
     @Override
@@ -99,7 +98,8 @@ public class HdfsFileOutput
     private void write(final Buffer buffer)
             throws RetryExecutor.RetryGiveupException
     {
-        re.run(new RetryExecutor.Retryable<Void>() {
+        re.run(new RetryExecutor.Retryable<Void>()
+        {
             @Override
             public Void call()
                     throws Exception

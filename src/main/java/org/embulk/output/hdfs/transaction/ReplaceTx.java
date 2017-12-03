@@ -59,5 +59,4 @@ public class ReplaceTx
         String pathPrefix = StrftimeUtil.strftime(task.getPathPrefix(), task.getRewindSeconds());
         return SamplePath.getDir(pathPrefix, task.getSequenceFormat(), task.getFileExt());
     }
-
 }

@@ -28,6 +28,7 @@ public interface ModeTask
     @Config("mode")
     @ConfigDefault("\"abort_if_exist\"")
     Mode getMode();
+
     void setMode(Mode mode);
 
     enum Mode
@@ -57,8 +58,7 @@ public interface ModeTask
         @SuppressWarnings("unused")
         public static Mode fromString(String value)
         {
-            switch (value)
-            {
+            switch (value) {
                 case "abort_if_exist":
                     return ABORT_IF_EXIST;
                 case "overwrite":
@@ -91,8 +91,7 @@ public interface ModeTask
 
         public Tx newTx()
         {
-            switch (this)
-            {
+            switch (this) {
                 case ABORT_IF_EXIST:
                     return new AbortIfExistTx();
                 case DELETE_FILES_IN_ADVANCE:
@@ -109,5 +108,4 @@ public interface ModeTask
         }
 
     }
-
 }
