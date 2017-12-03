@@ -1,3 +1,12 @@
+0.3.0 (2017-12-03)
+==================
+* Add: `mode` option.
+    * Add `replace` behaviour.
+* Deprecated: `delete_in_advance` option. Please use `mode` instead.
+* Deprecated: `overwrite` option. Please use `mode` instead.
+* Enhancement: Delete behaviour become safely.
+* Enhancement: Update embulk 0.8.38
+
 0.2.4 (2016-04-27)
 ==================
 - Enhancement: Avoid to create 0 byte files
