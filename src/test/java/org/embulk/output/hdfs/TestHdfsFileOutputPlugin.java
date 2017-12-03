@@ -107,9 +107,9 @@ public class TestHdfsFileOutputPlugin
         assertEquals(Lists.newArrayList(), task.getConfigFiles());
         assertEquals(Maps.newHashMap(), task.getConfig());
         assertEquals(0, task.getRewindSeconds());
-        assertEquals(false, task.getOverwrite());
+        assertEquals(Optional.absent(), task.getOverwrite());
         assertEquals(Optional.absent(), task.getDoas());
-        assertEquals(PluginTask.DeleteInAdvancePolicy.NONE, task.getDeleteInAdvance());
+        assertEquals(Optional.absent(), task.getDeleteInAdvance());
     }
 
     @Test(expected = ConfigException.class)
