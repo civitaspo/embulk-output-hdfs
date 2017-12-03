@@ -155,7 +155,7 @@ public class HdfsClient
         });
     }
 
-    public boolean delete(final Path path, final boolean recursive)
+    public boolean trash(final Path path)
     {
         return run(new Retryable<Boolean>()
         {
@@ -163,12 +163,12 @@ public class HdfsClient
             public Boolean call()
                     throws Exception
             {
-                return fs.delete(path, recursive);
+                return Trash.moveToAppropriateTrash(fs, path, conf);
             }
         });
     }
 
-    public void globAndRemove(final Path globPath)
+    public void globFilesAndTrash(final Path globPath)
     {
         for (final FileStatus fileStatus : glob(globPath)) {
             if (fileStatus.isDirectory()) {
@@ -176,21 +176,19 @@ public class HdfsClient
                         fileStatus.getPath(), fileStatus.getPath());
                 continue;
             }
-            logger.debug("Remove: {}", fileStatus.getPath());
-            boolean isRemoved = delete(fileStatus.getPath(), false);
-            if (!isRemoved) {
-                throw new RuntimeException(String.format("Remove Failed: %s", fileStatus.getPath()));
+            logger.debug("Move To Trash: {}", fileStatus.getPath());
+            if (!trash(fileStatus.getPath())) {
+                throw new RuntimeException(String.format("Failed to Move To Trash: %s", fileStatus.getPath()));
             }
         }
     }
 
-    public void globAndRemoveRecursive(final Path globPath)
+    public void globAndTrash(final Path globPath)
     {
         for (final FileStatus fileStatus : glob(globPath)) {
-            logger.debug("Remove: {}", fileStatus.getPath());
-            boolean isRemoved = delete(fileStatus.getPath(), true);
-            if (!isRemoved) {
-                throw new RuntimeException(String.format("Remove Failed: %s", fileStatus.getPath()));
+            logger.debug("Move To Trash: {}", fileStatus.getPath());
+            if (!trash(fileStatus.getPath())) {
+                throw new RuntimeException(String.format("Failed to Move To Trash: %s", fileStatus.getPath()));
             }
         }
     }
@@ -258,7 +256,7 @@ public class HdfsClient
                         throw new DataException(String.format("Directory Exists: %s", dst.toString()));
                     }
                     logger.info("Move To Trash: {}", dst);
-                    if (!new Trash(fs, conf).moveToTrash(dst)) {
+                    if (!trash(dst)) {
                         throw new IllegalStateException(String.format("Failed to Move To Trash: %s", dst.toString()));
                     }
                 }

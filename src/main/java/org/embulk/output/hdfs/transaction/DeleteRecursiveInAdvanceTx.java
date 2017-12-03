@@ -17,6 +17,6 @@ public class DeleteRecursiveInAdvanceTx
         HdfsClient hdfsClient = HdfsClient.build(task);
         Path globPath = new Path(getPathPrefix(task) + "*");
         logger.info("Delete {} (Recursive) in advance", globPath);
-        hdfsClient.globAndRemoveRecursive(globPath);
+        hdfsClient.globAndTrash(globPath);
     }
 }

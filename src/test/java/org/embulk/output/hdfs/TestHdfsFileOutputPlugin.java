@@ -201,14 +201,20 @@ public class TestHdfsFileOutputPlugin
         }
     }
 
+    private ConfigSource getDefaultFsConfig()
+    {
+        return Exec.newConfigSource()
+                .set("fs.hdfs.impl", "org.apache.hadoop.fs.RawLocalFileSystem")
+                .set("fs.file.impl", "org.apache.hadoop.fs.RawLocalFileSystem")
+                .set("fs.trash.interval", "3600")
+                .set("fs.defaultFS", "file:///");
+    }
+
     @Test
     public void testBulkLoad()
     {
         ConfigSource config = getBaseConfigSource()
-                .setNested("config", Exec.newConfigSource()
-                        .set("fs.hdfs.impl", "org.apache.hadoop.fs.RawLocalFileSystem")
-                        .set("fs.file.impl", "org.apache.hadoop.fs.RawLocalFileSystem")
-                        .set("fs.defaultFS", "file:///"));
+                .setNested("config", getDefaultFsConfig());
 
         run(config);
         List<String> fileList = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
@@ -230,10 +236,7 @@ public class TestHdfsFileOutputPlugin
         List<String> fileListBeforeRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
 
         ConfigSource config = getBaseConfigSource()
-                .setNested("config", Exec.newConfigSource()
-                        .set("fs.hdfs.impl", "org.apache.hadoop.fs.RawLocalFileSystem")
-                        .set("fs.file.impl", "org.apache.hadoop.fs.RawLocalFileSystem")
-                        .set("fs.defaultFS", "file:///"))
+                .setNested("config", getDefaultFsConfig())
                 .set("delete_in_advance", "RECURSIVE");
 
         run(config);
@@ -260,10 +263,7 @@ public class TestHdfsFileOutputPlugin
         List<String> fileListBeforeRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
 
         ConfigSource config = getBaseConfigSource()
-                .setNested("config", Exec.newConfigSource()
-                        .set("fs.hdfs.impl", "org.apache.hadoop.fs.RawLocalFileSystem")
-                        .set("fs.file.impl", "org.apache.hadoop.fs.RawLocalFileSystem")
-                        .set("fs.defaultFS", "file:///"))
+                .setNested("config", getDefaultFsConfig())
                 .set("delete_in_advance", "FILE_ONLY");
 
         run(config);

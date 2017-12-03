@@ -36,6 +36,10 @@ If you use `hadoop` user (hdfs admin user) as `doas`, and if `delete_in_advance`
 this means `embulk-output-hdfs` can destroy your hdfs.
 So, please be careful when you use `delete_in_advance` option and `doas` option ...
 
+## About DELETE
+
+When this plugin deletes files or directories, use [`Hadoop Trash API`](https://hadoop.apache.org/docs/r2.8.0/api/org/apache/hadoop/fs/Trash.html). So, you can find them in the trash during `fs.trash.interval`.
+
 ## Modes
 
 * **abort_if_exist**:
