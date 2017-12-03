@@ -11,7 +11,9 @@ import org.embulk.config.ConfigSource;
 import org.embulk.config.Task;
 import org.embulk.config.TaskReport;
 import org.embulk.config.TaskSource;
+import org.embulk.output.hdfs.ModeTask.Mode;
 import org.embulk.output.hdfs.client.HdfsClient;
+import org.embulk.output.hdfs.compat.ModeCompat;
 import org.embulk.output.hdfs.util.SafeWorkspaceName;
 import org.embulk.output.hdfs.util.SamplePath;
 import org.embulk.output.hdfs.util.StrftimeUtil;
@@ -26,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.embulk.output.hdfs.HdfsFileOutputPlugin.PluginTask.DeleteInAdvancePolicy;
+import static org.embulk.output.hdfs.ModeTask.Mode.REPLACE;
+import static org.embulk.output.hdfs.compat.ModeCompat.getMode;
 
 public class HdfsFileOutputPlugin
         implements FileOutputPlugin
@@ -33,7 +37,7 @@ public class HdfsFileOutputPlugin
     private static final Logger logger = Exec.getLogger(HdfsFileOutputPlugin.class);
 
     public interface PluginTask
-            extends Task
+            extends Task, ModeTask
     {
         @Config("config_files")
         @ConfigDefault("[]")
@@ -57,22 +61,21 @@ public class HdfsFileOutputPlugin
         @ConfigDefault("0")
         int getRewindSeconds();
 
+        @Deprecated  // Please Use `mode` option
         @Config("overwrite")
-        @ConfigDefault("false")
-        boolean getOverwrite();
+        @ConfigDefault("null")
+        Optional<Boolean> getOverwrite();
 
         @Config("doas")
         @ConfigDefault("null")
         Optional<String> getDoas();
 
+        @Deprecated
         enum DeleteInAdvancePolicy{ NONE, FILE_ONLY, RECURSIVE}
+        @Deprecated  // Please Use `mode` option
         @Config("delete_in_advance")
-        @ConfigDefault("\"NONE\"")
-        DeleteInAdvancePolicy getDeleteInAdvance();
-
-        @Config("atomic")
-        @ConfigDefault("false")
-        boolean getAtomic();
+        @ConfigDefault("null")
+        Optional<DeleteInAdvancePolicy> getDeleteInAdvance();
 
         @Config("workspace")
         @ConfigDefault("\"/tmp\"")
