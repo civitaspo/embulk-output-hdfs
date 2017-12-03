@@ -223,8 +223,8 @@ public class TestHdfsFileOutputPlugin
             throws IOException
     {
         for (int n = 0; n <= 10; n++) {
-            tmpFolder.newFile("embulk-output-hdfs_testDeleteInAdvance_RECURSIVE_file_" + n + ".txt");
-            tmpFolder.newFolder("embulk-output-hdfs_testDeleteInAdvance_RECURSIVE_directory_" + n);
+            tmpFolder.newFile("embulk-output-hdfs_file_" + n + ".txt");
+            tmpFolder.newFolder("embulk-output-hdfs_directory_" + n);
         }
 
         List<String> fileListBeforeRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
@@ -240,7 +240,7 @@ public class TestHdfsFileOutputPlugin
 
         List<String> fileListAfterRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
         assertNotEquals(fileListBeforeRun, fileListAfterRun);
-        assertThat(fileListAfterRun, not(hasItem(containsString("embulk-output-hdfs_testDeleteInAdvance_RECURSIVE_directory_"))));
+        assertThat(fileListAfterRun, not(hasItem(containsString("embulk-output-hdfs_directory"))));
         assertThat(fileListAfterRun, not(hasItem(containsString("txt"))));
         assertThat(fileListAfterRun, hasItem(containsString(pathPrefix + "001.00.csv")));
         assertRecordsInFile(String.format("%s/%s001.00.csv",
@@ -253,8 +253,8 @@ public class TestHdfsFileOutputPlugin
             throws IOException
     {
         for (int n = 0; n <= 10; n++) {
-            tmpFolder.newFile("embulk-output-hdfs_testDeleteInAdvance_FILE_ONLY_file_" + n + ".txt");
-            tmpFolder.newFolder("embulk-output-hdfs_testDeleteInAdvance_FILE_ONLY_directory_" + n);
+            tmpFolder.newFile("embulk-output-hdfs_file_" + n + ".txt");
+            tmpFolder.newFolder("embulk-output-hdfs_directory_" + n);
         }
 
         List<String> fileListBeforeRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
@@ -271,7 +271,7 @@ public class TestHdfsFileOutputPlugin
         List<String> fileListAfterRun = lsR(Lists.<String>newArrayList(), Paths.get(tmpFolder.getRoot().getAbsolutePath()));
         assertNotEquals(fileListBeforeRun, fileListAfterRun);
         assertThat(fileListAfterRun, not(hasItem(containsString("txt"))));
-        assertThat(fileListAfterRun, hasItem(containsString("embulk-output-hdfs_testDeleteInAdvance_FILE_ONLY_directory_")));
+        assertThat(fileListAfterRun, hasItem(containsString("embulk-output-hdfs_directory")));
         assertThat(fileListAfterRun, hasItem(containsString(pathPrefix + "001.00.csv")));
         assertRecordsInFile(String.format("%s/%s001.00.csv",
                 tmpFolder.getRoot().getAbsolutePath(),
