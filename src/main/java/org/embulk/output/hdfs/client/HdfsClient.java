@@ -8,6 +8,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Trash;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.embulk.config.ConfigException;
 import org.embulk.output.hdfs.HdfsFileOutputPlugin;
 import org.embulk.spi.DataException;
@@ -47,6 +48,7 @@ public class HdfsClient
         for (Map.Entry<String, String> config : configs.entrySet()) {
             c.set(config.getKey(), config.getValue());
         }
+        UserGroupInformation.setConfiguration(c);
         return c;
     }
 
