@@ -94,5 +94,5 @@ $ ./gradlew gem
 
 ```
 $ ./gradlew classpath
-$ bundle exec embulk run -I lib example.yml
+$ embulk run -I lib example/config.yml
 ```
