@@ -24,8 +24,7 @@ dependencies {
     compile  "org.embulk:embulk-core:0.9.20"
     provided "org.embulk:embulk-core:0.9.20"
     // compile "YOUR_JAR_DEPENDENCY_GROUP:YOUR_JAR_DEPENDENCY_MODULE:YOUR_JAR_DEPENDENCY_VERSION"
-    compile 'org.apache.hadoop:hadoop-client:2.6.0'
-    compile 'com.google.guava:guava:15.0'
+    compile 'org.apache.hadoop:hadoop-client:2.9.2'
     testCompile "junit:junit:4.+"
     testCompile "org.embulk:embulk-core:0.9.20:tests"
     testCompile "org.embulk:embulk-standards:0.9.20"
