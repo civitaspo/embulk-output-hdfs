@@ -1,3 +1,9 @@
+0.4.0.pre (2019-12-07)
+======================
+* Use Github Actions instead of TravisCI
+* Update dependencies (java 7 -> 8, embulk v0.8.38 -> v0.9.20, hadoop-client 2.6.0 -> 2.9.2)
+* Add `UserGroupInformation#setConfiguration` for kerberos authentication
+
 0.3.0 (2017-12-03)
 ==================
 * Add: `mode` option.
