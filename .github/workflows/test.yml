@@ -1,7 +1,7 @@
 name: Test CI
 
 on:
-  - push
+  - pull_request
 
 jobs:
   test:
@@ -17,4 +17,9 @@ jobs:
       run: ./gradlew test
     - name: Coveralls Test Report
       run: ./gradlew jacocoTestReport coveralls
+      env:
+        COVERALLS_REPO_TOKEN: ${{secrets.COVERALLS_REPO_TOKEN}}
+        CI_NAME: Github Actions
+        CI_BRANCH: ${{github.ref}}
+        CI_PULL_REQUEST: ${{github.event.pull_request.html_url}}
 
