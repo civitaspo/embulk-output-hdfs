@@ -17,6 +17,7 @@ import org.embulk.spi.util.RetryExecutor;
 import org.slf4j.Logger;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -27,8 +28,29 @@ public class HdfsClient
 {
     public static HdfsClient build(HdfsFileOutputPlugin.PluginTask task)
     {
+        setKerberosKeytabAuthention(task);
         Configuration conf = buildConfiguration(task.getConfigFiles(), task.getConfig());
         return new HdfsClient(conf, task.getDoas());
+    }
+
+    ;
+
+    /**
+     * https://docs.cloudera.com/documentation/enterprise/6/6.2/topics/cdh_sg_princ_auth_java.html
+     */
+    public static void setKerberosKeytabAuthention(HdfsFileOutputPlugin.PluginTask task){
+        if(task.getKeytabPath().isPresent() &&
+                task.getKeytabPrincipal().isPresent() &&
+                task.getKrb5ConfigPath().isPresent()
+                ){
+            logger.info("Kerberos Keytab conf = krb5Path :{}, keytabprincipal: {}, keytabPath: {}", task.getKrb5ConfigPath().get(), task.getKeytabPrincipal().get(), task.getKeytabPath().get());
+            try {
+                System.setProperty("java.security.krb5.conf", task.getKrb5ConfigPath().get());
+                UserGroupInformation.loginUserFromKeytab(task.getKeytabPrincipal().get(), task.getKeytabPath().get());
+            } catch (IOException e) {
+                throw new ConfigException(e);
+            }
+        }
     }
 
     ;

@@ -59,6 +59,18 @@ public class HdfsFileOutputPlugin
         @ConfigDefault("null")
         Optional<String> getDoas();
 
+        @Config("krb5_config_path")
+        @ConfigDefault("null")
+        Optional<String> getKrb5ConfigPath();
+
+        @Config("keytab_principal")
+        @ConfigDefault("null")
+        Optional<String> getKeytabPrincipal();
+
+        @Config("keytab_path")
+        @ConfigDefault("null")
+        Optional<String> getKeytabPath();
+
         @Deprecated
         enum DeleteInAdvancePolicy
         {
