@@ -1,6 +1,7 @@
 package org.embulk.output.hdfs.client;
 
 import com.google.common.base.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileStatus;
@@ -17,6 +18,7 @@ import org.embulk.spi.util.RetryExecutor;
 import org.slf4j.Logger;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -28,7 +30,40 @@ public class HdfsClient
     public static HdfsClient build(HdfsFileOutputPlugin.PluginTask task)
     {
         Configuration conf = buildConfiguration(task.getConfigFiles(), task.getConfig());
+        setKerberosKeytabAuthention(conf, task.getKeytabConfig());
         return new HdfsClient(conf, task.getDoas());
+    }
+
+    ;
+
+    /**
+     * https://docs.cloudera.com/documentation/enterprise/6/6.2/topics/cdh_sg_princ_auth_java.html
+     */
+    public static void setKerberosKeytabAuthention(Configuration conf, Map<String, String> keytabConfig){
+        if(keytabConfig == null || keytabConfig.size() == 0){
+            UserGroupInformation.setConfiguration(conf);
+            return;
+        }
+        String krb5ConfigPath = keytabConfig.get("krb5_config_path");
+        String keytabPrincipal = keytabConfig.get("keytab_principal");
+        String keytabPath = keytabConfig.get("keytab_path");
+
+        logger.info("Keytab config init. krb5_config_path: {} , keytab_principal : {}, keytab_path : {}", krb5ConfigPath, keytabPrincipal, keytabPath);
+
+        if(StringUtils.isEmpty(krb5ConfigPath) ||
+                StringUtils.isEmpty(keytabPrincipal) ||
+                StringUtils.isEmpty(keytabPath)){
+            throw new ConfigException(String.format("Keytab config not enough. krb5_config_path: {} , keytab_principal : {}, keytab_path : {}", krb5ConfigPath, keytabPrincipal, keytabPath));
+        }
+
+        try {
+            System.setProperty("java.security.krb5.conf", krb5ConfigPath);
+            UserGroupInformation.setConfiguration(conf);
+            UserGroupInformation.loginUserFromKeytab(keytabPrincipal, keytabPath);
+        } catch (IOException e) {
+            throw new ConfigException(e);
+        }
+
     }
 
     ;
@@ -48,7 +83,6 @@ public class HdfsClient
         for (Map.Entry<String, String> config : configs.entrySet()) {
             c.set(config.getKey(), config.getValue());
         }
-        UserGroupInformation.setConfiguration(c);
         return c;
     }
 

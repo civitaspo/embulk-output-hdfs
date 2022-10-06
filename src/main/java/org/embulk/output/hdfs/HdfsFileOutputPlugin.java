@@ -59,6 +59,9 @@ public class HdfsFileOutputPlugin
         @ConfigDefault("null")
         Optional<String> getDoas();
 
+        @Config("keytab_config")
+        @ConfigDefault("{}")
+        Map<String, String> getKeytabConfig();
         @Deprecated
         enum DeleteInAdvancePolicy
         {

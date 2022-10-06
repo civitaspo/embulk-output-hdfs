@@ -28,6 +28,10 @@ A File Output Plugin for Embulk to write HDFS.
     - `RECURSIVE`: delete files and directories
 - **mode**: "abort_if_exist", "overwrite", "delete_files_in_advance", "delete_recursive_in_advance", or "replace". See below. (string, optional, default: `"abort_if_exist"`)
     * In the future, default mode will become `"replace"`.
+- **keytab_config**: For keytab auth for kerberos. see https://docs.cloudera.com/documentation/enterprise/6/6.2/topics/cdh_sg_princ_auth_java.html (hash, default: `{}`)
+  - **krb5_config_path**: krb5.conf file path (string, optional)
+  - **keytab_principal**: user principal (string, optional)
+  - **keytab_path**: Keytab file path (string, optional)
 
 ## CAUTION
 If you use `hadoop` user (hdfs admin user) as `doas`, and if `delete_in_advance` is `RECURSIVE`,
