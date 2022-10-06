@@ -1,6 +1,7 @@
 package org.embulk.output.hdfs.client;
 
 import com.google.common.base.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileStatus;
@@ -28,7 +29,7 @@ public class HdfsClient
 {
     public static HdfsClient build(HdfsFileOutputPlugin.PluginTask task)
     {
-        setKerberosKeytabAuthention(task);
+        setKerberosKeytabAuthention(task.getKeytabConfig());
         Configuration conf = buildConfiguration(task.getConfigFiles(), task.getConfig());
         return new HdfsClient(conf, task.getDoas());
     }
@@ -38,19 +39,29 @@ public class HdfsClient
     /**
      * https://docs.cloudera.com/documentation/enterprise/6/6.2/topics/cdh_sg_princ_auth_java.html
      */
-    public static void setKerberosKeytabAuthention(HdfsFileOutputPlugin.PluginTask task){
-        if(task.getKeytabPath().isPresent() &&
-                task.getKeytabPrincipal().isPresent() &&
-                task.getKrb5ConfigPath().isPresent()
-                ){
-            logger.info("Kerberos Keytab conf = krb5Path :{}, keytabprincipal: {}, keytabPath: {}", task.getKrb5ConfigPath().get(), task.getKeytabPrincipal().get(), task.getKeytabPath().get());
-            try {
-                System.setProperty("java.security.krb5.conf", task.getKrb5ConfigPath().get());
-                UserGroupInformation.loginUserFromKeytab(task.getKeytabPrincipal().get(), task.getKeytabPath().get());
-            } catch (IOException e) {
-                throw new ConfigException(e);
-            }
+    public static void setKerberosKeytabAuthention(Map<String, String> keytabConfig){
+        if(keytabConfig == null || keytabConfig.size() == 0){
+            return;
         }
+        String krb5ConfigPath = keytabConfig.get("krb5_config_path");
+        String keytabPrincipal = keytabConfig.get("keytab_principal");
+        String keytabPath = keytabConfig.get("keytab_path");
+
+        logger.info("Keytab config init. krb5_config_path: {} , keytab_principal : {}, keytab_path : {}", krb5ConfigPath, keytabPrincipal, keytabPath);
+
+        if(StringUtils.isEmpty(krb5ConfigPath) ||
+                StringUtils.isEmpty(keytabPrincipal) ||
+                StringUtils.isEmpty(keytabPath)){
+            throw new ConfigException(String.format("Keytab config not enough. krb5_config_path: {} , keytab_principal : {}, keytab_path : {}", krb5ConfigPath, keytabPrincipal, keytabPath));
+        }
+
+        try {
+            System.setProperty("java.security.krb5.conf", krb5ConfigPath);
+            UserGroupInformation.loginUserFromKeytab(keytabPrincipal, keytabPath);
+        } catch (IOException e) {
+            throw new ConfigException(e);
+        }
+
     }
 
     ;
